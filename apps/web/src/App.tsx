@@ -114,6 +114,19 @@ export const App: React.FC = () => {
     }
   }, [selectedRunId]);
 
+  useEffect(() => {
+    const terminalStatuses = new Set(["PASSED", "HEALED", "FAILED", "REVIEW_REQUIRED"]);
+    if (
+      !selectedRunId ||
+      runDetail?.run.id !== selectedRunId ||
+      terminalStatuses.has(runDetail.run.status)
+    ) {
+      return;
+    }
+    const interval = setInterval(() => loadRunDetail(selectedRunId), 1500);
+    return () => clearInterval(interval);
+  }, [selectedRunId, runDetail?.run.id, runDetail?.run.status]);
+
   // Handle Tab selection from Sidebar
   const handleSelectTab = (tab: TabId) => {
     setActiveTab(tab);
@@ -276,7 +289,14 @@ export const App: React.FC = () => {
           {activeTab === "runs" && (
             <RunExplorerView
               runDetail={runDetail}
-              onRefresh={loadData}
+              onRefresh={async () => {
+                await loadData();
+                if (runDetail?.run.id) await loadRunDetail(runDetail.run.id);
+              }}
+              onOpenRun={(runId) => {
+                setSelectedRunId(runId);
+                setActiveTab("runs");
+              }}
               onRunBaseline={() => handleRunTest(activeTestId)}
               isRunning={isRunningTest}
             />

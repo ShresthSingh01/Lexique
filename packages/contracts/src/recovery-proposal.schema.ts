@@ -55,7 +55,10 @@ export const PolicyEvaluationResultSchema = z.object({
   decision: PolicyDecisionSchema,
   reasonCodes: z.array(z.string()),
   explanation: z.string(),
-  validatedCandidate: ObservedCandidateSchema.optional()
+  validatedCandidate: ObservedCandidateSchema.optional(),
+  similarityScore: z.number().min(0).max(1).optional(),
+  minimumSimilarity: z.number().min(0).max(1).optional(),
+  humanApproved: z.boolean().optional()
 });
 
 export type PolicyEvaluationResult = z.infer<typeof PolicyEvaluationResultSchema>;

@@ -10,6 +10,11 @@ if (fs.existsSync(envPath)) {
   dotenv.config();
 }
 
+const minimumCandidateSimilarity = Number(process.env.MIN_CANDIDATE_SIMILARITY ?? "0.85");
+if (!Number.isFinite(minimumCandidateSimilarity) || minimumCandidateSimilarity < 0 || minimumCandidateSimilarity > 1) {
+  throw new Error("MIN_CANDIDATE_SIMILARITY must be a finite number between 0 and 1.");
+}
+
 export const CONFIG = {
   port: parseInt(process.env.PORT || "3000", 10),
   demoPort: parseInt(process.env.DEMO_PORT || "3001", 10),
@@ -18,6 +23,7 @@ export const CONFIG = {
   storageDir: path.resolve(process.cwd(), process.env.STORAGE_DIR || "storage"),
   databasePath: path.resolve(process.cwd(), process.env.DATABASE_PATH || "storage/intentlock.db"),
   headless: process.env.HEADLESS !== "false",
+  minimumCandidateSimilarity,
 
   // LLM Configuration
   llmProvider: process.env.LLM_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : (process.env.MISTRAL_API_KEY ? "mistral" : "openai")),

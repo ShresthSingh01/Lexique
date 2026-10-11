@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { RunDetail } from "../types.js";
 import { StatusBadge } from "../components/StatusBadge.js";
-import { commitHeal } from "../api.js";
+import { commitHeal, submitHumanReview } from "../api.js";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -13,13 +13,17 @@ import {
   FileCode2,
   Terminal,
   Activity,
-  Layers
+  Layers,
+  UserRoundCheck,
+  XCircle,
+  MessageSquareText
 } from "lucide-react";
 
 interface Props {
   runDetail: RunDetail | null;
   onRefresh: () => void;
   onRunBaseline?: () => void;
+  onOpenRun?: (runId: string) => void;
   isRunning?: boolean;
 }
 
@@ -27,16 +31,28 @@ export const RunExplorerView: React.FC<Props> = ({
   runDetail,
   onRefresh,
   onRunBaseline,
+  onOpenRun,
   isRunning = false
 }) => {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"diagnostics" | "recovery" | "verifier" | "events">("diagnostics");
   const [committing, setCommitting] = useState(false);
   const [commitStatus, setCommitStatus] = useState<string | null>(null);
+  const [reviewCandidateId, setReviewCandidateId] = useState("");
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setSelectedStepId(null);
+    setReviewCandidateId("");
+    setReviewNote("");
+    setReviewMessage(null);
   }, [runDetail?.run.id]);
+
+  useEffect(() => {
+    if (runDetail?.run.status === "REVIEW_REQUIRED") setActiveTab("diagnostics");
+  }, [runDetail?.run.id, runDetail?.run.status]);
 
   if (!runDetail) {
     return (
@@ -63,19 +79,29 @@ export const RunExplorerView: React.FC<Props> = ({
   const { run, steps, events, recoveryAttempts, artifacts } = runDetail;
 
   // Selected step or first failed/healed step or first step
-  const activeStep = steps.find(s => s.step_id === selectedStepId) ||
+  const activeStep = steps.find(s => s.id === selectedStepId) ||
     steps.find(s => s.status === "FAILED" || s.status === "HEALED") ||
-    steps[0];
+    (run.status === "FAILED" ? steps[steps.length - 1] : steps[0]);
 
   // Artifacts for current step
   const stepArtifacts = artifacts
-    .filter(a => a.step_id === activeStep?.step_id)
+    .filter(a =>
+      a.step_id === activeStep?.step_id &&
+      (a.attempt_number ?? 1) === activeStep?.attempt_number
+    )
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
   const screenshotArtifact = stepArtifacts.find(a => a.artifact_type === "screenshot");
   const domArtifact = stepArtifacts.find(a => a.artifact_type === "dom_snapshot");
 
   // Recovery attempt for this step
-  const recoveryAttempt = recoveryAttempts.find(r => r.step_id === activeStep?.step_id) || recoveryAttempts[0];
+  const recoveryAttempt = recoveryAttempts.find(r => r.step_id === activeStep?.step_id);
+  const reviewCandidates = recoveryAttempt?.candidateSet || [];
+  const selectedReviewCandidateId = reviewCandidateId ||
+    recoveryAttempt?.proposal?.targetCandidateId ||
+    reviewCandidates[0]?.candidateId ||
+    "";
+  const humanReviews = runDetail.humanReviews || [];
+  const approvedRetryExists = humanReviews.some(review => review.decision === "APPROVE_RETRY");
 
   // Find chosen candidate and healed selector
   const chosenCandidate = recoveryAttempt?.candidateSet?.find(
@@ -97,12 +123,46 @@ export const RunExplorerView: React.FC<Props> = ({
     }
   };
 
+  const handleHumanReview = async (decision: "approve_retry" | "reject" | "clarification") => {
+    if (decision === "clarification" && !reviewNote.trim()) {
+      setReviewMessage("Add a note describing what needs clarification.");
+      return;
+    }
+    if (decision === "approve_retry" && !selectedReviewCandidateId) {
+      setReviewMessage("Select an observed candidate before approving a retry.");
+      return;
+    }
+    setReviewSubmitting(true);
+    setReviewMessage(null);
+    try {
+      const result = await submitHumanReview(run.id, {
+        decision,
+        candidateId: decision === "approve_retry" ? selectedReviewCandidateId : undefined,
+        note: reviewNote.trim()
+      });
+      setReviewNote("");
+      setReviewMessage(result.message);
+      await onRefresh();
+      if (result.childRunId) onOpenRun?.(result.childRunId);
+    } catch (error: any) {
+      setReviewMessage(`Could not submit review: ${error.message}`);
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   // Failure and verifier events
   const failureEvent = events.find(e => e.type === "FAILURE_CLASSIFIED");
   const verifierEvents = events.filter(e => e.type === "VERIFICATION_CHECK_PASSED" || e.type === "VERIFICATION_CHECK_FAILED");
   const failedVerifierEvents = verifierEvents.filter(e => e.type === "VERIFICATION_CHECK_FAILED");
   const verificationStarted = events.some(e => e.type === "VERIFICATION_STARTED");
   const recoveryStarted = events.find(e => e.type === "RECOVERY_STARTED");
+  const candidateEvidence = [...events].reverse().find(e =>
+    e.type === "RECOVERY_CANDIDATES_FOUND" && e.payload.stepId === activeStep?.step_id
+  );
+  const candidateSimilarityById = new Map<string, number>(
+    (candidateEvidence?.payload.candidates || []).map((candidate: any) => [candidate.id, candidate.similarity])
+  );
   const evidenceEvent = [...events].reverse().find(e =>
     e.type === "EVIDENCE_CAPTURED" && e.payload.stepId === activeStep?.step_id
   );
@@ -180,7 +240,7 @@ export const RunExplorerView: React.FC<Props> = ({
               return (
                 <div
                   key={step.id}
-                  onClick={() => setSelectedStepId(step.step_id)}
+                  onClick={() => setSelectedStepId(step.id)}
                   style={{
                     background: isSelected ? "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)" : "#f8fafc",
                     border: isSelected ? "1px solid #c7d2fe" : "1px solid var(--border-light)",
@@ -378,7 +438,7 @@ export const RunExplorerView: React.FC<Props> = ({
           ) : (
             <div className="card-clean" style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", marginBottom: 20 }}>
               {evidenceEvent?.payload.captureFailed
-                ? "Evidence capture failed for this attempt. Check the run events for artifact recorder details."
+                ? (evidenceEvent.payload.captureErrors || []).join("; ") || "Evidence capture failed for this attempt. See Raw Events for details."
                 : `No screenshot was recorded for ${activeStep?.step_name || "this step"} in this run. Earlier runs do not create retroactive evidence.`}
             </div>
           )}
@@ -393,7 +453,7 @@ export const RunExplorerView: React.FC<Props> = ({
               marginBottom: 16
             }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#e11d48", marginBottom: 6, letterSpacing: "0.05em", fontFamily: "var(--font-mono)" }}>
-                PLAYWRIGHT EXCEPTION STACK TRACE
+              PLAYWRIGHT STEP ERROR
               </div>
               <pre style={{ fontSize: 11, color: "#be123c", whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "var(--font-mono)" }}>
                 {activeStep.error_summary}
@@ -443,6 +503,115 @@ export const RunExplorerView: React.FC<Props> = ({
           {/* Tab 1: Failure Diagnostics */}
           {activeTab === "diagnostics" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {run.status === "REVIEW_REQUIRED" && (
+                <div className="card-clean" style={{ padding: 14, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, color: "#92400e", fontWeight: 800, marginBottom: 6 }}>
+                    <UserRoundCheck size={16} />
+                    Human review required
+                  </div>
+                  <p style={{ fontSize: 12, color: "#78350f", lineHeight: 1.5, marginBottom: 10 }}>
+                    Automation stopped safely because no candidate met policy or the observed target was ambiguous. Review the captured candidate evidence below. Approval queues a linked retry; it does not mark this run healed or bypass fresh candidate checks and the original contract verifier.
+                  </p>
+                  {reviewCandidates.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+                      {reviewCandidates.map((candidate: any) => (
+                        <label key={candidate.candidateId} style={{
+                          display: "grid",
+                          gridTemplateColumns: "18px 1fr",
+                          gap: 8,
+                          alignItems: "start",
+                          padding: 8,
+                          background: "#fff",
+                          border: `1px solid ${selectedReviewCandidateId === candidate.candidateId ? "#f59e0b" : "#e5e7eb"}`,
+                          borderRadius: 6,
+                          cursor: "pointer"
+                        }}>
+                          <input
+                            type="radio"
+                            name={`review-candidate-${run.id}`}
+                            value={candidate.candidateId}
+                            checked={selectedReviewCandidateId === candidate.candidateId}
+                            onChange={() => setReviewCandidateId(candidate.candidateId)}
+                            style={{ marginTop: 2, accentColor: "#d97706" }}
+                          />
+                          <span>
+                            <strong style={{ fontSize: 12, color: "#111827" }}>{candidate.name || candidate.role || candidate.candidateId}</strong>
+                            <span style={{ display: "block", fontSize: 10, color: "#475569", marginTop: 2 }}>
+                              {candidate.candidateId} · {candidate.role || "unknown role"} · {candidate.isVisible ? "visible" : "hidden"} · {candidate.isEnabled ? "enabled" : "disabled"} · {candidate.isUnique ? "unique" : "ambiguous"}
+                            </span>
+                            {candidateSimilarityById.has(candidate.candidateId) && (
+                              <span style={{ display: "block", fontSize: 10, color: "#92400e", marginTop: 2 }}>
+                                Semantic similarity: {candidateSimilarityById.get(candidate.candidateId)?.toFixed(4)} · automatic threshold: {candidateEvidence?.payload.minimumSimilarity?.toFixed(2)}
+                              </span>
+                            )}
+                            {candidate.selector && (
+                              <code style={{ display: "block", fontSize: 10, color: "#64748b", marginTop: 3, overflowWrap: "anywhere" }}>
+                                {candidate.selector}
+                              </code>
+                            )}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 12, color: "#78350f", marginBottom: 10 }}>
+                      No recovery candidates were captured for this run. You can reject the proposal or record what needs clarification; an approval retry is unavailable.
+                    </p>
+                  )}
+                  <textarea
+                    value={reviewNote}
+                    onChange={event => setReviewNote(event.target.value)}
+                    placeholder="Optional review note; required for clarification"
+                    rows={2}
+                    maxLength={2000}
+                    style={{ width: "100%", resize: "vertical", padding: 8, border: "1px solid #fcd34d", borderRadius: 6, font: "inherit", fontSize: 12, marginBottom: 8 }}
+                  />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    <button
+                      className="btn btn-primary"
+                      disabled={reviewSubmitting || approvedRetryExists || reviewCandidates.length === 0 || !reviewCandidates.some((candidate: any) => candidate.candidateId === selectedReviewCandidateId && candidate.isVisible && candidate.isEnabled && candidate.isUnique)}
+                      onClick={() => handleHumanReview("approve_retry")}
+                      style={{ padding: "6px 9px", fontSize: 11 }}
+                    >
+                      <UserRoundCheck size={13} />
+                      Approve safe retry
+                    </button>
+                    <button className="btn btn-secondary" disabled={reviewSubmitting || approvedRetryExists} onClick={() => handleHumanReview("reject")} style={{ padding: "6px 9px", fontSize: 11 }}>
+                      <XCircle size={13} />
+                      Reject
+                    </button>
+                    <button className="btn btn-secondary" disabled={reviewSubmitting || approvedRetryExists} onClick={() => handleHumanReview("clarification")} style={{ padding: "6px 9px", fontSize: 11 }}>
+                      <MessageSquareText size={13} />
+                      Request clarification
+                    </button>
+                  </div>
+                  {approvedRetryExists && (
+                    <p style={{ fontSize: 11, color: "#92400e", marginTop: 8 }}>
+                      A retry was already approved for this run. Review decision history remains available below.
+                    </p>
+                  )}
+                  {reviewMessage && <p role="status" style={{ fontSize: 11, color: "#78350f", marginTop: 8 }}>{reviewMessage}</p>}
+                  {humanReviews.length > 0 && (
+                    <div style={{ borderTop: "1px solid #fde68a", marginTop: 10, paddingTop: 8 }}>
+                      <strong style={{ fontSize: 11, color: "#78350f" }}>Review history</strong>
+                      {humanReviews.map(review => (
+                        <div key={review.id} style={{ fontSize: 10, color: "#78350f", marginTop: 5 }}>
+                          {review.decision.replaceAll("_", " ")} · {new Date(review.created_at).toLocaleString()}
+                          {review.note ? ` — ${review.note}` : ""}
+                          {review.child_run_id && (
+                            <button
+                              onClick={() => onOpenRun?.(review.child_run_id!)}
+                              style={{ display: "block", border: 0, padding: 0, background: "none", color: "#4f46e5", cursor: "pointer", font: "inherit", textDecoration: "underline" }}
+                            >
+                              Open retry run {review.child_run_id}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {failureEvent ? (
                 <>
                   <div className="card-clean" style={{ padding: 14, borderLeft: "4px solid #4f46e5" }}>

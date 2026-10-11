@@ -471,7 +471,7 @@ Acceptance criteria:
 
 ## FR-15 — Human review and repair promotion (SHOULD)
 
-If schedule permits, allow the user to approve/reject a recovery proposal. An approved repair may be saved as a reusable locator preference or step mapping with provenance and contract version linkage. It must not modify the test's success conditions. Promotion requires a clean replay pass.
+The Run Explorer shall let a reviewer approve a retry for a uniquely observed candidate, reject the proposal, or record a clarification note. Decisions and notes are audited against the original run. Approval queues a linked child run; it is not a pass and does not bypass candidate visibility, enabled state, uniqueness, destructive-action, action-type, replay, or original contract-verification gates. The retry must freshly observe and match the reviewed target before executing it. A failed or stale match ends safely without selecting a different candidate. An approved repair may be saved as a reusable locator preference or step mapping with provenance and contract version linkage only after a clean replay and verifier pass. Human feedback must never modify the test's success conditions.
 
 # 8. System Architecture
 
@@ -607,6 +607,8 @@ The LLM must select from the currently observed candidates. Example schema (illu
 Allowed `decision` values: `SELECT_CANDIDATE`, `NO_SAFE_MATCH`. Allowed action types should be limited to the operations needed for the demo (`click`, `fill`, `select`, `press`, and, only if justified, a safe navigation/scroll operation). A candidate is bound to the observed page state and invalidated if the page changes before execution.
 
 The model must never provide executable code, raw shell commands, arbitrary filesystem paths, arbitrary browser scripts or unbounded navigation targets.
+
+The semantic auto-acceptance threshold is configured once by the API (`MIN_CANDIDATE_SIMILARITY`, default `0.85`) and applied to candidates from every proposal provider. Scores below the threshold require an explicit human review decision; failure-classifier confidence is a separate metric and must not be substituted for candidate similarity.
 
 ## 9.3 Recovery decision rules
 
@@ -1104,4 +1106,3 @@ The following official documentation informs the implementation approach. Pin de
 3. **Playwright assertions:** documents auto-retrying web assertions and recommended assertion patterns. https://playwright.dev/docs/test-assertions
 4. **Playwright Trace Viewer:** describes recording and inspecting actions, page snapshots, screenshots, console/network activity and test reports. https://playwright.dev/docs/trace-viewer-intro
 5. **Playwright tracing API:** explains trace recording and cautions about lower-level tracing not recording test assertions. https://playwright.dev/docs/api/class-tracing
-

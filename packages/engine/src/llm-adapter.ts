@@ -205,7 +205,7 @@ Select the candidate that safely fulfills this step intent, or return NO_SAFE_MA
     }
 
     // Single strong match
-    if (top.similarity >= 0.50 && top.candidate.isUnique && top.candidate.isVisible) {
+    if (top.similarity >= CONFIG.minimumCandidateSimilarity && top.candidate.isUnique && top.candidate.isVisible) {
       return {
         decision: "SELECT_CANDIDATE",
         targetCandidateId: top.candidateId,
@@ -219,7 +219,7 @@ Select the candidate that safely fulfills this step intent, or return NO_SAFE_MA
 
     return {
       decision: "NO_SAFE_MATCH",
-      rationale: `Top candidate '${top.candidateName}' reached cosine similarity ${top.similarity}, which is below the safe acceptance threshold (0.50).`,
+      rationale: `Top candidate '${top.candidateName}' reached cosine similarity ${top.similarity}, which is below the configured auto-acceptance threshold (${CONFIG.minimumCandidateSimilarity.toFixed(2)}).`,
       confidence: top.similarity,
       evidenceRefs: []
     };

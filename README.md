@@ -16,6 +16,7 @@ Unlike generic AI browser agents or selector-guessing wrappers:
 5. **Clean Fixture Replay:** A proposal is never marked healed on partial state. The entire test replays from a clean baseline with one bounded step override.
 6. **Independent Outcome Verifier:** Success is verified independently against both the UI confirmation page and the backend order database (SKU, quantity, tax, total, payment status, and duplicate submission checks).
 7. **Refusal to Heal Real Regressions:** Seeded business logic errors (incorrect totals, payment failure, backend 503) are strictly preserved as `FAILED` (0 false heals).
+8. **Audited Human Review:** A reviewer can approve a retry, reject a candidate, or request clarification. Approval queues a linked retry and never bypasses fresh candidate checks or contract verification.
 
 ---
 
@@ -92,7 +93,10 @@ MISTRAL_API_KEY=your_key_here
 LLM_MODEL=mistral-small-latest
 STORAGE_DIR=./storage
 DATABASE_PATH=./storage/intentlock.db
+MIN_CANDIDATE_SIMILARITY=0.85
 ```
+
+`MIN_CANDIDATE_SIMILARITY` is the single semantic auto-acceptance cutoff for both local and cloud proposal providers. A candidate below the configured value requires human review. The Settings screen reads the effective value from the API.
 
 ### 3. Install & Build
 ```bash

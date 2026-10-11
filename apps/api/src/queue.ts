@@ -1,5 +1,5 @@
 import { db, RunOrchestrator } from "@intentlock/engine";
-import { TestContract } from "@intentlock/contracts";
+import { ObservedCandidate, TestContract } from "@intentlock/contracts";
 import { SseManager } from "./sse.js";
 
 interface QueueJob {
@@ -7,6 +7,10 @@ interface QueueJob {
   testId: string;
   contractVersion: number;
   mutationScenarioId?: string | null;
+  parentRunId?: string;
+  approvedStepId?: string;
+  approvedCandidate?: ObservedCandidate;
+  reviewDecisionId?: string;
 }
 
 export class RunQueue {
@@ -45,6 +49,10 @@ export class RunQueue {
         runId: job.runId,
         contract,
         mutationScenarioId: job.mutationScenarioId,
+        parentRunId: job.parentRunId,
+        approvedStepId: job.approvedStepId,
+        approvedCandidate: job.approvedCandidate,
+        reviewDecisionId: job.reviewDecisionId,
         onEvent: (event) => {
           SseManager.broadcast(event);
         }

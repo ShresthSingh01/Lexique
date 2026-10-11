@@ -17,6 +17,7 @@ import { LlmAdapter } from "./llm-adapter.js";
 import { RecoveryPolicyGate } from "./recovery-policy.js";
 import { OutcomeVerifier } from "./outcome-verifier.js";
 import { CONFIG } from "./config.js";
+import { SemanticVectorEngine } from "./semantic-vsm.js";
 
 export type EventCallback = (event: RunEvent) => void;
 
@@ -24,6 +25,10 @@ export interface RunOptions {
   runId: string;
   contract: TestContract;
   mutationScenarioId?: string | null;
+  parentRunId?: string;
+  approvedStepId?: string;
+  approvedCandidate?: ObservedCandidate;
+  reviewDecisionId?: string;
   onEvent?: EventCallback;
 }
 
@@ -31,6 +36,10 @@ export class RunOrchestrator {
   private runId: string;
   private contract: TestContract;
   private mutationScenarioId: string | null;
+  private parentRunId?: string;
+  private approvedStepId?: string;
+  private approvedCandidate?: ObservedCandidate;
+  private reviewDecisionId?: string;
   private onEvent?: EventCallback;
   private sequenceNo: number = 0;
   private currentStatus: RunStatus = "QUEUED";
@@ -44,6 +53,10 @@ export class RunOrchestrator {
     this.runId = options.runId;
     this.contract = options.contract;
     this.mutationScenarioId = options.mutationScenarioId || null;
+    this.parentRunId = options.parentRunId;
+    this.approvedStepId = options.approvedStepId;
+    this.approvedCandidate = options.approvedCandidate;
+    this.reviewDecisionId = options.reviewDecisionId;
     this.onEvent = options.onEvent;
     this.recorder = new EvidenceRecorder(this.runId);
   }
@@ -100,6 +113,8 @@ export class RunOrchestrator {
       testId: this.contract.testId,
       contractVersion: this.contract.contractVersion,
       mutationScenarioId: this.mutationScenarioId,
+      parentRunId: this.parentRunId || null,
+      humanReviewDecisionId: this.reviewDecisionId || null,
       targetBaseUrl: this.contract.baseUrl
     });
     this.updateStatus("RUNNING");
@@ -128,9 +143,23 @@ export class RunOrchestrator {
 
         for (const check of outcome.checks) {
           if (check.passed) {
-            this.emit("VERIFICATION_CHECK_PASSED", { checkId: check.checkId, description: check.description });
+            this.emit("VERIFICATION_CHECK_PASSED", {
+              checkId: check.checkId,
+              description: check.description,
+              type: check.type,
+              expected: check.expected,
+              actual: check.actual,
+              evidenceRef: check.evidenceRef
+            });
           } else {
-            this.emit("VERIFICATION_CHECK_FAILED", { checkId: check.checkId, description: check.description, actual: check.actual, expected: check.expected });
+            this.emit("VERIFICATION_CHECK_FAILED", {
+              checkId: check.checkId,
+              description: check.description,
+              type: check.type,
+              expected: check.expected,
+              actual: check.actual,
+              evidenceRef: check.evidenceRef
+            });
           }
         }
 
@@ -184,30 +213,95 @@ export class RunOrchestrator {
       this.emit("RECOVERY_STARTED", { stepId: failedStep.stepId, intent: failedStep.intent });
 
       const candidates = await StagehandAdapter.observeCandidates(this.page, failedStep.actionType);
+      const candidateScores = new Map(
+        SemanticVectorEngine.rankCandidates(failedStep.intent, candidates)
+          .map(candidate => [candidate.candidateId, candidate.similarity])
+      );
       this.emit("RECOVERY_CANDIDATES_FOUND", {
         stepId: failedStep.stepId,
         count: candidates.length,
-        candidates: candidates.map(c => ({ id: c.candidateId, name: c.name, role: c.role, isUnique: c.isUnique, selector: c.selector }))
+        minimumSimilarity: CONFIG.minimumCandidateSimilarity,
+        candidates: candidates.map(c => ({
+          id: c.candidateId,
+          name: c.name,
+          role: c.role,
+          isUnique: c.isUnique,
+          selector: c.selector,
+          similarity: candidateScores.get(c.candidateId) ?? 0
+        }))
       });
 
       // 7. Recovery Proposal via LLM
-      const { proposal, modelName, latencyMs } = await LlmAdapter.proposeRecovery(failedStep, candidates);
+      let proposal: RecoveryProposal;
+      let modelName: string;
+      let latencyMs: number;
+      let approvedCandidateId: string | undefined;
+      if (this.approvedCandidate && this.reviewDecisionId) {
+        const matches = failedStep.stepId === this.approvedStepId
+          ? candidates.filter(candidate =>
+            candidate.selector === this.approvedCandidate?.selector &&
+            candidate.name === this.approvedCandidate?.name &&
+            candidate.role === this.approvedCandidate?.role
+          )
+          : [];
+        if (matches.length === 1) {
+          approvedCandidateId = matches[0].candidateId;
+          proposal = {
+            decision: "SELECT_CANDIDATE",
+            targetCandidateId: approvedCandidateId,
+            actionType: failedStep.actionType,
+            expectedTransition: failedStep.expectedTransition || "next_state",
+            rationale: `A reviewer approved '${matches[0].name || matches[0].candidateId}'. The candidate was freshly observed and will still pass all deterministic safety checks.`,
+            evidenceRefs: []
+          };
+          modelName = "human-review";
+          latencyMs = 0;
+        } else {
+          const reason = failedStep.stepId !== this.approvedStepId
+            ? `The approved retry failed at unexpected step '${failedStep.name}', not the reviewed step. No other candidate was proposed.`
+            : `The human-approved target '${this.approvedCandidate.name || this.approvedCandidate.candidateId}' was not uniquely present with the same selector, name, and role in the fresh page observation. No action was taken.`;
+          proposal = {
+            decision: "NO_SAFE_MATCH",
+            rationale: reason,
+            evidenceRefs: []
+          };
+          modelName = "human-review-stale-candidate";
+          latencyMs = 0;
+        }
+      } else {
+        const result = await LlmAdapter.proposeRecovery(failedStep, candidates);
+        proposal = result.proposal;
+        modelName = result.modelName;
+        latencyMs = result.latencyMs;
+      }
       this.emit("RECOVERY_PROPOSED", {
         stepId: failedStep.stepId,
         decision: proposal.decision,
         targetCandidateId: proposal.targetCandidateId,
         rationale: proposal.rationale,
         modelName,
-        latencyMs
+        latencyMs,
+        humanReviewDecisionId: this.reviewDecisionId || null
       });
 
       // 8. Deterministic Policy Gate
-      const policyResult = RecoveryPolicyGate.evaluate(proposal, candidates, failedStep, 1);
+      const policyResult = RecoveryPolicyGate.evaluate(
+        proposal,
+        candidates,
+        failedStep,
+        1,
+        CONFIG.minimumCandidateSimilarity,
+        approvedCandidateId
+      );
       this.emit("RECOVERY_POLICY_DECIDED", {
         stepId: failedStep.stepId,
         decision: policyResult.decision,
         reasonCodes: policyResult.reasonCodes,
-        explanation: policyResult.explanation
+        explanation: policyResult.explanation,
+        similarityScore: policyResult.similarityScore,
+        minimumSimilarity: policyResult.minimumSimilarity ?? CONFIG.minimumCandidateSimilarity,
+        humanApproved: policyResult.humanApproved || false,
+        humanReviewDecisionId: this.reviewDecisionId || null
       });
 
       // Record recovery attempt in DB
@@ -271,9 +365,23 @@ export class RunOrchestrator {
 
       for (const check of verifierOutcome.checks) {
         if (check.passed) {
-          this.emit("VERIFICATION_CHECK_PASSED", { checkId: check.checkId, description: check.description });
+          this.emit("VERIFICATION_CHECK_PASSED", {
+            checkId: check.checkId,
+            description: check.description,
+            type: check.type,
+            expected: check.expected,
+            actual: check.actual,
+            evidenceRef: check.evidenceRef
+          });
         } else {
-          this.emit("VERIFICATION_CHECK_FAILED", { checkId: check.checkId, description: check.description, actual: check.actual, expected: check.expected });
+          this.emit("VERIFICATION_CHECK_FAILED", {
+            checkId: check.checkId,
+            description: check.description,
+            type: check.type,
+            expected: check.expected,
+            actual: check.actual,
+            evidenceRef: check.evidenceRef
+          });
         }
       }
 
@@ -468,8 +576,24 @@ export class RunOrchestrator {
     stepRecordId: string
   ): Promise<{ screenshotArtifactId: string; domArtifactId: string }> {
     const label = `${isReplay ? "replay" : "step"}_${step.stepId}`;
-    const screenshotArtifactId = await this.recorder.captureScreenshot(page, step.stepId, label);
-    const domArtifactId = await this.recorder.captureDomSnapshot(page, step.stepId);
+    const attemptNumber = isReplay ? 2 : 1;
+    const captureErrors: string[] = [];
+    const [screenshotArtifactId, domArtifactId] = await Promise.all([
+      this.recorder.captureScreenshot(page, step.stepId, label, attemptNumber).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        captureErrors.push(`Screenshot: ${message}`);
+        return "";
+      }),
+      this.recorder.captureDomSnapshot(page, step.stepId, attemptNumber).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        captureErrors.push(`DOM snapshot: ${message}`);
+        return "";
+      })
+    ]);
+
+    for (const error of captureErrors) {
+      console.warn(`[EvidenceRecorder] Run ${this.runId}, step ${step.stepId}: ${error}`);
+    }
 
     db.prepare(`
       UPDATE run_steps
@@ -480,10 +604,11 @@ export class RunOrchestrator {
     this.emit("EVIDENCE_CAPTURED", {
       stepId: step.stepId,
       stepName: step.name,
-      attempt: isReplay ? 2 : 1,
+      attempt: attemptNumber,
       screenshotArtifactId: screenshotArtifactId || null,
       domArtifactId: domArtifactId || null,
-      captureFailed: !screenshotArtifactId || !domArtifactId
+      captureFailed: captureErrors.length > 0,
+      captureErrors
     });
 
     return { screenshotArtifactId, domArtifactId };
