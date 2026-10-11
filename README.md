@@ -27,6 +27,17 @@
 
 When an interface drifts, Ojastra never soft-pedals correctness or modifies test assertions. If the drift is harmless (e.g. a renamed button or restructured DOM layout), it discovers visible candidates, selects the matching action, verifies it against 7 strict safety rules, resets test fixtures, replays the workflow from a clean baseline, and independently checks both UI banners and backend database state. If the failure is a real defect (such as an incorrect pricing calculation or payment error), Ojastra strictly refuses to heal and fails closed.
 
+Unlike generic AI browser agents or selector-guessing wrappers, Ojastra provides:
+
+1. **Immutable Intent Contracts:** Recovery cannot soften assertions or invent arbitrary workflows.
+2. **Rule-First Failure Classification:** Harmless locator drift is separated from application, network, and business-invariant failures.
+3. **Constrained Candidate Discovery:** The model selects only from observed candidates or returns `NO_SAFE_MATCH`; it cannot generate arbitrary selectors or code.
+4. **Deterministic Policy Gate:** Candidate uniqueness, interactability, semantic compatibility, attempt bounds, and risk rules are checked before action.
+5. **Clean Fixture Replay:** A proposal is validated by replaying the workflow from a clean baseline.
+6. **Independent Outcome Verification:** UI and backend database state are checked against the original contract.
+7. **Refusal to Heal Real Regressions:** Business logic, payment, and infrastructure failures remain failures.
+8. **Audited Human Review:** Reviewers can approve a retry, reject a candidate, or request clarification. A retry repeats candidate and contract checks.
+
 ---
 
 ## ⚡ Core Architectural Pillars
@@ -206,6 +217,47 @@ d:/LEXIQUE/
 ├── tsconfig.base.json                # Shared TypeScript compiler settings
 └── package.json                      # Workspace root scripts
 ```
+
+---
+
+## ⚡ Quick Start
+
+### 1. Prerequisites
+- **Node.js**: v20+ or v24+
+- **pnpm**: v9+ or v10+
+- **Playwright Chromium**: installed via `npx playwright install chromium`
+
+### 2. Setup Environment
+```bash
+cp .env.example .env
+```
+Configure your `.env` (Mistral or OpenAI compatible):
+```env
+PORT=3000
+DEMO_PORT=3001
+WEB_PORT=5173
+LLM_PROVIDER=mistral
+MISTRAL_API_KEY=your_key_here
+LLM_MODEL=mistral-small-latest
+STORAGE_DIR=./storage
+DATABASE_PATH=./storage/intentlock.db
+MIN_CANDIDATE_SIMILARITY=0.85
+```
+
+`MIN_CANDIDATE_SIMILARITY` is the single semantic auto-acceptance cutoff for both local and cloud proposal providers. A candidate below the configured value requires human review. The Settings screen reads the effective value from the API.
+
+### 3. Install & Build
+```bash
+pnpm install
+pnpm build
+```
+
+### 4. Run the Stack
+```bash
+# Starts demo-app (3001), API (3000), and Workbench Web UI (5173) concurrently:
+pnpm dev
+```
+Open **http://localhost:5173** in your browser.
 
 ---
 

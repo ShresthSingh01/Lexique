@@ -471,36 +471,10 @@ export const RunExplorerView: React.FC<Props> = ({
               runStatus={run.status}
               onOpenScreenshot={() => setCenterViewMode("viewport")}
             />
-          ) : screenshotArtifact ? (
-            <div className="card-clean" style={{ overflow: "hidden", marginBottom: 20 }}>
-              <div style={{
-                background: "#f8fafc",
-                borderBottom: "1px solid var(--border-light)",
-                padding: "8px 14px",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 11,
-                color: "var(--text-secondary)",
-                fontFamily: "var(--font-mono)"
-              }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }}></span>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }}></span>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }}></span>
-                <span style={{ marginLeft: 6, color: "#4f46e5", fontWeight: 600 }}>
-                  Playwright Chromium • {activeStep?.step_name || "No step selected"} • Attempt {activeStep?.attempt_number || 1}
-                </span>
-              </div>
-              <img
-                src={`/api/runs/${run.id}/artifacts/${screenshotArtifact.id}`}
-                alt="Playwright viewport capture"
-                style={{ width: "100%", height: "auto", display: "block" }}
-              />
-            </div>
           ) : (
             <div className="card-clean" style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", marginBottom: 20 }}>
               {evidenceEvent?.payload.captureFailed
-                ? "Evidence capture failed for this attempt. Check the run events for artifact recorder details."
+                ? (evidenceEvent.payload.captureErrors || []).join("; ") || "Evidence capture failed for this attempt. Check the run events for artifact recorder details."
                 : `No screenshot was recorded for ${activeStep?.step_name || "this step"} in this run. Earlier runs do not create retroactive evidence.`}
             </div>
           )}
