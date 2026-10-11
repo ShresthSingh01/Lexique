@@ -152,42 +152,23 @@ export const MutationLabView: React.FC<Props> = ({
         alignItems: "center"
       }}>
         <div>
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)",
-            border: "1px solid #c7d2fe",
-            padding: "4px 12px",
-            borderRadius: 9999,
-            fontSize: 11,
-            fontWeight: 800,
-            color: "#4f46e5",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            marginBottom: 10,
-            boxShadow: "0 1px 3px rgba(79, 70, 229, 0.1)"
-          }}>
-            <FlaskConical size={14} color="#4f46e5" />
-            Deterministic Evaluation Suite • 8 Controlled Scenarios
-          </div>
           <h1 style={{
-            fontSize: 24,
+            fontSize: 22,
             fontWeight: 800,
             letterSpacing: "-0.02em",
-            marginBottom: 6,
+            marginBottom: 4,
             color: "var(--text-primary)"
           }}>
-            Mutation Lab — Controlled Drift & Bug Injection
+            Mutation Lab
           </h1>
           <p style={{
             fontSize: 13,
             color: "var(--text-secondary)",
-            maxWidth: 760,
-            lineHeight: 1.6
+            maxWidth: 720,
+            lineHeight: 1.5,
+            margin: 0
           }}>
-            Inject real DOM changes and application bugs into the local ShopMart store.
-            Watch Ojastra auto-heal benign UI drift in seconds, and strictly refuse to heal real business regressions.
+            Simulate interface drift and application regressions to evaluate test self-healing policies and defect rejection.
           </p>
         </div>
 
@@ -196,13 +177,13 @@ export const MutationLabView: React.FC<Props> = ({
           onClick={handleReset}
           disabled={resetting}
           style={{
-            padding: "10px 18px",
+            padding: "8px 16px",
             fontSize: 12,
             fontWeight: 600
           }}
         >
-          <RotateCw size={14} color="#4f46e5" className={resetting ? "pulsing-dot" : ""} />
-          <span>{resetting ? "Resetting Store Fixtures..." : "Reset Store Baseline (Version A)"}</span>
+          <RotateCw size={13} color="#4f46e5" className={resetting ? "pulsing-dot" : ""} />
+          <span>{resetting ? "Resetting Fixtures..." : "Reset Store Fixtures"}</span>
         </button>
       </div>
 

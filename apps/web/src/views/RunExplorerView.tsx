@@ -48,7 +48,7 @@ export const RunExplorerView: React.FC<Props> = ({
           No Active Test Run Selected
         </h2>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 520, margin: "0 auto 24px auto", lineHeight: 1.6 }}>
-          Select a test execution from the Overview table, or launch a live baseline run to inspect actual Playwright viewport screenshots, Stagehand candidate sets, and database verification receipts.
+          Select a test execution from the Runs table, or launch a baseline run to inspect viewport screenshots, candidate sets, and database verification results.
         </p>
         {onRunBaseline && (
           <button className="btn btn-primary" onClick={onRunBaseline} disabled={isRunning} style={{ padding: "10px 22px" }}>

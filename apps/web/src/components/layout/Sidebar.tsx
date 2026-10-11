@@ -74,19 +74,12 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning }) 
             Ojastra
           </div>
           <div style={{
-            display: "inline-block",
-            fontSize: 9,
-            fontWeight: 700,
-            color: "#4f46e5",
-            background: "#eef2ff",
-            border: "1px solid #c7d2fe",
-            padding: "1px 5px",
-            borderRadius: 4,
-            fontFamily: "var(--font-mono)",
-            marginTop: 3,
-            letterSpacing: "0.04em"
+            fontSize: 11,
+            fontWeight: 500,
+            color: "var(--text-tertiary)",
+            marginTop: 2
           }}>
-            EVIDENCE-GATED E2E
+            Test Automation
           </div>
         </div>
       </div>
@@ -205,18 +198,18 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning }) 
                 overflow: "hidden",
                 textOverflow: "ellipsis"
               }}>
-                Ojastra Engine
+                Engine Active
               </span>
               <span className="pulsing-emerald-dot" style={{ width: 5, height: 5 }} />
             </div>
             <div style={{
               fontSize: 10,
-              fontWeight: 600,
+              fontWeight: 500,
               color: "var(--text-tertiary)",
               fontFamily: "var(--font-mono)",
               marginTop: 1
             }}>
-              Localhost :3000 • Headless
+              Local :3000 • Headless
             </div>
           </div>
         </div>
