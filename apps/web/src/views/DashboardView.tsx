@@ -1,19 +1,15 @@
 import React from "react";
 import {
   Play,
-  FileCode2,
   FlaskConical,
   CheckCircle2,
   RefreshCw,
   AlertOctagon,
-  ShieldCheck,
-  Clock,
   Database,
   ArrowRight,
   TrendingUp,
   Cpu,
   Trash2,
-  Sparkles,
   Inbox
 } from "lucide-react";
 import { BenchmarkMetrics, TestRun } from "../types.js";
@@ -85,130 +81,84 @@ export const DashboardView: React.FC<Props> = ({
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 32px" }}>
-      {/* Hero Banner (Linear Alabaster Luminous Card) */}
-      <div className="hero-card-alabaster" style={{
-        padding: "32px 36px",
-        marginBottom: 28,
+      {/* Dashboard Top Header */}
+      <div style={{
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "center"
+        alignItems: "center",
+        marginBottom: 24
       }}>
-        <div style={{ maxWidth: 680 }}>
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)",
-            border: "1px solid #c7d2fe",
-            padding: "4px 12px",
-            borderRadius: 9999,
-            fontSize: 11,
-            fontWeight: 800,
-            color: "#4f46e5",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            marginBottom: 12,
-            boxShadow: "0 1px 3px rgba(79, 70, 229, 0.1)"
-          }}>
-            <ShieldCheck size={14} color="#4f46e5" />
-            Evidence-Gated Autonomous E2E Engine
-          </div>
+        <div>
           <h1 style={{
-            fontSize: 28,
+            fontSize: 22,
             fontWeight: 800,
-            letterSpacing: "-0.03em",
-            lineHeight: 1.25,
-            marginBottom: 10,
-            color: "var(--text-primary)"
+            letterSpacing: "-0.02em",
+            color: "var(--text-primary)",
+            margin: 0
           }}>
-            Self-Healing Software Tests
+            Dashboard
           </h1>
           <p style={{
-            fontSize: 14,
+            fontSize: 13,
             color: "var(--text-secondary)",
-            lineHeight: 1.6,
+            marginTop: 4,
             marginBottom: 0
           }}>
-            Deterministic E2E test execution with immutable contracts, automated Stagehand candidate discovery,
-            constrained LLM selection, and independent database oracle receipts.
+            Real-time test execution metrics, pass rates, and self-healing telemetry
           </p>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 210 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {onClearRuns && runs.length > 0 && (
+            <button
+              onClick={onClearRuns}
+              className="btn btn-secondary"
+              style={{
+                fontSize: 12,
+                padding: "8px 14px",
+                color: "#64748b"
+              }}
+              title="Clear Run History"
+            >
+              <Trash2 size={13} />
+              <span>Clear History</span>
+            </button>
+          )}
+
+          <button
+            className="btn btn-secondary"
+            onClick={onOpenMutationLab}
+            style={{
+              fontSize: 12,
+              padding: "8px 14px"
+            }}
+          >
+            <FlaskConical size={14} color="#6366f1" />
+            <span>Mutation Lab</span>
+          </button>
+
           <button
             className="btn btn-primary"
             onClick={onRunBaseline}
             disabled={isRunning}
             style={{
-              padding: "10px 18px",
+              padding: "8px 18px",
               fontWeight: 700,
               fontSize: 13
             }}
           >
             {isRunning ? (
               <>
-                <RefreshCw size={15} className="pulsing-dot" />
+                <RefreshCw size={14} className="pulsing-dot" />
                 <span>Running Test...</span>
               </>
             ) : (
               <>
-                <Play size={15} fill="#ffffff" />
-                <span>Run Baseline Suite</span>
+                <Play size={14} fill="#ffffff" />
+                <span>Run Test Suite</span>
               </>
             )}
           </button>
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              className="btn btn-secondary"
-              onClick={onOpenTestEditor}
-              style={{
-                flex: 1,
-                fontSize: 12,
-                padding: "8px 12px"
-              }}
-            >
-              <FileCode2 size={14} color="#4f46e5" />
-              <span>Contract Spec</span>
-            </button>
-
-            <button
-              className="btn btn-secondary"
-              onClick={onOpenMutationLab}
-              style={{
-                flex: 1,
-                fontSize: 12,
-                padding: "8px 12px"
-              }}
-            >
-              <FlaskConical size={14} color="#9333ea" />
-              <span>Mutation Lab</span>
-            </button>
-          </div>
-
-          {onClearRuns && runs.length > 0 && (
-            <button
-              onClick={onClearRuns}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#94a3b8",
-                fontSize: 11,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5,
-                padding: "4px",
-                transition: "color 0.15s ease"
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#e11d48")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
-            >
-              <Trash2 size={12} />
-              <span>Clear Run History (Clean Slate)</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -234,7 +184,7 @@ export const DashboardView: React.FC<Props> = ({
               color: totalRunsCount > 0 ? "#4f46e5" : "#64748b",
               border: `1px solid ${totalRunsCount > 0 ? "#c7d2fe" : "#e2e8f0"}`
             }}>
-              {totalRunsCount > 0 ? "Active Telemetry" : "Idle"}
+              {totalRunsCount > 0 ? "Active" : "Idle"}
             </span>
           </div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
@@ -244,7 +194,7 @@ export const DashboardView: React.FC<Props> = ({
             {totalRunsCount}
           </div>
           <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
-            <span>{totalRunsCount > 0 ? "Playwright runs recorded" : "No runs recorded"}</span>
+            <span>{totalRunsCount > 0 ? "Recorded test runs" : "No runs recorded"}</span>
           </div>
         </div>
 
@@ -273,7 +223,7 @@ export const DashboardView: React.FC<Props> = ({
             {passedCount}
           </div>
           <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>
-            Deterministic Baseline Matches
+            Baseline verified
           </div>
         </div>
 
@@ -292,7 +242,7 @@ export const DashboardView: React.FC<Props> = ({
               color: "#2563eb",
               border: "1px solid #bfdbfe"
             }}>
-              {healRate}% Auto-Recovered
+              {healRate}% Recovered
             </span>
           </div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
@@ -302,7 +252,7 @@ export const DashboardView: React.FC<Props> = ({
             {healedCount}
           </div>
           <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>
-            Autonomous Selector Recoveries
+            Auto-healed via drift policy
           </div>
         </div>
 
@@ -321,17 +271,17 @@ export const DashboardView: React.FC<Props> = ({
               color: "#e11d48",
               border: "1px solid #fecdd3"
             }}>
-              Safe Abstention
+              {failedCount > 0 ? `${failedCount} Failed` : "0 Failed"}
             </span>
           </div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
-            Failed (Bugs)
+            Failed
           </div>
           <div style={{ fontSize: 32, fontWeight: 800, color: "#e11d48", fontFamily: "var(--font-mono)", lineHeight: 1.1 }}>
             {failedCount}
           </div>
           <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>
-            True Regressions Refused Heal
+            Unresolved regressions
           </div>
         </div>
       </div>
@@ -344,7 +294,7 @@ export const DashboardView: React.FC<Props> = ({
               Recent Test Executions
             </h2>
             <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-              Telemetry audits, recovery actions, and backend database verification receipts
+              Execution history, recovery actions, and verification status
             </p>
           </div>
 
@@ -358,7 +308,7 @@ export const DashboardView: React.FC<Props> = ({
               padding: "3px 9px",
               borderRadius: 9999
             }}>
-              {totalRunsCount} Runs in Database
+              {totalRunsCount} runs
             </span>
           </div>
         </div>
@@ -376,10 +326,10 @@ export const DashboardView: React.FC<Props> = ({
               <Inbox size={22} color="#4f46e5" />
             </div>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>
-              No Test Runs Recorded (Clean Slate)
+              No Test Runs Yet
             </h3>
             <p style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 520, margin: "0 auto 20px auto", lineHeight: 1.6 }}>
-              The workbench is in an unseeded state. Run the baseline suite to verify the canonical checkout flow, or inject a controlled mutation from Mutation Lab.
+              Execute the test suite to inspect execution telemetry, or inject controlled interface drift from Mutation Lab.
             </p>
             <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
               <button
@@ -389,7 +339,7 @@ export const DashboardView: React.FC<Props> = ({
                 style={{ padding: "9px 20px" }}
               >
                 <Play size={14} fill="#ffffff" />
-                <span>Execute Baseline Run</span>
+                <span>Run Test Suite</span>
               </button>
               <button
                 className="btn btn-secondary"
@@ -460,12 +410,12 @@ export const DashboardView: React.FC<Props> = ({
                         {r.oracleVerified ? (
                           <div style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#059669", fontSize: 11, fontWeight: 700 }}>
                             <Database size={13} />
-                            <span>DB Match</span>
+                            <span>DB Verified</span>
                           </div>
                         ) : (
                           <div style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#e11d48", fontSize: 11, fontWeight: 700 }}>
                             <AlertOctagon size={13} />
-                            <span>Invariant Broken</span>
+                            <span>Failed Assertion</span>
                           </div>
                         )}
                       </td>
@@ -483,7 +433,7 @@ export const DashboardView: React.FC<Props> = ({
                             onSelectRun(r.id);
                           }}
                         >
-                          Inspect Evidence
+                          Inspect
                           <ArrowRight size={12} color="#4f46e5" />
                         </button>
                       </td>
@@ -496,7 +446,7 @@ export const DashboardView: React.FC<Props> = ({
         )}
       </div>
 
-      {/* System Infrastructure Health Strip */}
+      {/* System Infrastructure Status Strip */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(3, 1fr)",
@@ -508,10 +458,10 @@ export const DashboardView: React.FC<Props> = ({
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
-              Engine Orchestrator
+              Test Engine
             </div>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-              Playwright Chromium Headless • Port 3000
+              Playwright Chromium • Port 3000
             </div>
           </div>
         </div>
@@ -522,10 +472,10 @@ export const DashboardView: React.FC<Props> = ({
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
-              SQLite WAL Database
+              Local Database
             </div>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-              WAL Mode Active • Zero Contention
+              SQLite WAL • storage/ojastra.db
             </div>
           </div>
         </div>
@@ -536,10 +486,10 @@ export const DashboardView: React.FC<Props> = ({
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
-              ShopMart Demo Webstore
+              Target Application
             </div>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-              HTTP Active • Port 3001
+              ShopMart Store • Port 3001
             </div>
           </div>
         </div>

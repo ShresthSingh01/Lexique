@@ -1,10 +1,11 @@
 {
-  "name": "intentlock-monorepo",
+  "name": "ojastra-monorepo",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.30.1",
   "scripts": {
+    "start": "npm run dev",
     "dev": "concurrently -n demo,api,web -c blue,green,magenta \"pnpm --filter @intentlock/demo-app dev\" \"pnpm --filter @intentlock/api dev\" \"pnpm --filter @intentlock/web dev\"",
     "dev:demo": "pnpm --filter @intentlock/demo-app dev",
     "dev:api": "pnpm --filter @intentlock/api dev",
