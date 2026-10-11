@@ -149,16 +149,6 @@ export class RunOrchestrator {
       const failedStep = baselineResult.failedStep!;
       const errorMsg = baselineResult.errorMessage || "Unknown error";
 
-      // 4. Record evidence on failure
-      const screenshotId = await this.recorder.captureScreenshot(this.page, failedStep.stepId, "fail");
-      const domId = await this.recorder.captureDomSnapshot(this.page, failedStep.stepId);
-      this.emit("EVIDENCE_CAPTURED", {
-        stepId: failedStep.stepId,
-        screenshotArtifactId: screenshotId,
-        domArtifactId: domId,
-        errorMessage: errorMsg
-      });
-
       // 5. Classify Failure
       this.updateStatus("DIAGNOSING");
       const classification = FailureClassifier.classify({
@@ -415,11 +405,20 @@ export class RunOrchestrator {
         }
 
         const durationMs = Date.now() - stepStartTime;
+        const evidence = await this.captureStepEvidence(page, step, isReplay, stepRecordId);
         db.prepare(`
           UPDATE run_steps
-          SET status = ?, finished_at = ?, duration_ms = ?
+          SET status = ?, finished_at = ?, duration_ms = ?,
+              screenshot_artifact_id = ?, dom_artifact_id = ?
           WHERE id = ?
-        `).run(isTargetOverridden ? "HEALED" : "PASSED", new Date().toISOString(), durationMs, stepRecordId);
+        `).run(
+          isTargetOverridden ? "HEALED" : "PASSED",
+          new Date().toISOString(),
+          durationMs,
+          evidence.screenshotArtifactId || null,
+          evidence.domArtifactId || null,
+          stepRecordId
+        );
 
         this.emit("STEP_PASSED", {
           stepId: step.stepId,
@@ -430,11 +429,20 @@ export class RunOrchestrator {
 
       } catch (err: any) {
         const durationMs = Date.now() - stepStartTime;
+        const evidence = await this.captureStepEvidence(page, step, isReplay, stepRecordId);
         db.prepare(`
           UPDATE run_steps
-          SET status = 'FAILED', finished_at = ?, duration_ms = ?, error_summary = ?
+          SET status = 'FAILED', finished_at = ?, duration_ms = ?, error_summary = ?,
+              screenshot_artifact_id = ?, dom_artifact_id = ?
           WHERE id = ?
-        `).run(new Date().toISOString(), durationMs, err.message, stepRecordId);
+        `).run(
+          new Date().toISOString(),
+          durationMs,
+          err.message,
+          evidence.screenshotArtifactId || null,
+          evidence.domArtifactId || null,
+          stepRecordId
+        );
 
         this.emit("STEP_FAILED", {
           stepId: step.stepId,
@@ -450,7 +458,34 @@ export class RunOrchestrator {
         };
       }
     }
-
     return { success: true };
+  }
+
+  private async captureStepEvidence(
+    page: Page,
+    step: WorkflowStep,
+    isReplay: boolean,
+    stepRecordId: string
+  ): Promise<{ screenshotArtifactId: string; domArtifactId: string }> {
+    const label = `${isReplay ? "replay" : "step"}_${step.stepId}`;
+    const screenshotArtifactId = await this.recorder.captureScreenshot(page, step.stepId, label);
+    const domArtifactId = await this.recorder.captureDomSnapshot(page, step.stepId);
+
+    db.prepare(`
+      UPDATE run_steps
+      SET screenshot_artifact_id = ?, dom_artifact_id = ?
+      WHERE id = ?
+    `).run(screenshotArtifactId || null, domArtifactId || null, stepRecordId);
+
+    this.emit("EVIDENCE_CAPTURED", {
+      stepId: step.stepId,
+      stepName: step.name,
+      attempt: isReplay ? 2 : 1,
+      screenshotArtifactId: screenshotArtifactId || null,
+      domArtifactId: domArtifactId || null,
+      captureFailed: !screenshotArtifactId || !domArtifactId
+    });
+
+    return { screenshotArtifactId, domArtifactId };
   }
 }

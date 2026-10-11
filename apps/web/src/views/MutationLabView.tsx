@@ -9,8 +9,7 @@ import {
   Database,
   CheckCircle2,
   AlertOctagon,
-  ArrowRight,
-  Filter
+  ArrowRight
 } from "lucide-react";
 import { BenchmarkMetrics, MutationScenario } from "../types.js";
 
@@ -29,7 +28,6 @@ export const MutationLabView: React.FC<Props> = ({
   onResetFixtures,
   onSelectRun
 }) => {
-  const [activeCategory, setActiveCategory] = useState<"all" | "ui" | "workflow" | "bugs">("all");
   const [runningId, setRunningId] = useState<string | null>(null);
   const [resetting, setResetting] = useState<boolean>(false);
 
@@ -125,11 +123,6 @@ export const MutationLabView: React.FC<Props> = ({
     }
   ];
 
-  const filteredScenarios = scenarios.filter(s => {
-    if (activeCategory === "all") return true;
-    return s.category === activeCategory;
-  });
-
   const handleRun = async (id: string) => {
     setRunningId(id);
     try {
@@ -213,99 +206,9 @@ export const MutationLabView: React.FC<Props> = ({
         </button>
       </div>
 
-      {/* Category Filter Pills Bar */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        marginBottom: 24,
-        background: "#ffffff",
-        padding: "8px 12px",
-        borderRadius: 10,
-        border: "1px solid var(--border-light)",
-        boxShadow: "var(--shadow-sm)"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", fontSize: 12, fontWeight: 700, marginRight: 8 }}>
-          <Filter size={14} color="#4f46e5" />
-          <span>Filter Category:</span>
-        </div>
-
-        <button
-          onClick={() => setActiveCategory("all")}
-          style={{
-            background: activeCategory === "all" ? "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)" : "#f8fafc",
-            color: activeCategory === "all" ? "#ffffff" : "#475569",
-            border: activeCategory === "all" ? "1px solid #4338ca" : "1px solid #e2e8f0",
-            padding: "6px 14px",
-            borderRadius: 7,
-            fontSize: 12,
-            fontWeight: activeCategory === "all" ? 700 : 500,
-            cursor: "pointer",
-            boxShadow: activeCategory === "all" ? "0 2px 8px rgba(79, 70, 229, 0.3)" : "none",
-            transition: "all 0.14s ease"
-          }}
-        >
-          All Scenarios (8)
-        </button>
-
-        <button
-          onClick={() => setActiveCategory("ui")}
-          style={{
-            background: activeCategory === "ui" ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "#f8fafc",
-            color: activeCategory === "ui" ? "#ffffff" : "#475569",
-            border: activeCategory === "ui" ? "1px solid #1d4ed8" : "1px solid #e2e8f0",
-            padding: "6px 14px",
-            borderRadius: 7,
-            fontSize: 12,
-            fontWeight: activeCategory === "ui" ? 700 : 500,
-            cursor: "pointer",
-            boxShadow: activeCategory === "ui" ? "0 2px 8px rgba(37, 99, 235, 0.3)" : "none",
-            transition: "all 0.14s ease"
-          }}
-        >
-          UI Changes (Healable)
-        </button>
-
-        <button
-          onClick={() => setActiveCategory("workflow")}
-          style={{
-            background: activeCategory === "workflow" ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)" : "#f8fafc",
-            color: activeCategory === "workflow" ? "#ffffff" : "#475569",
-            border: activeCategory === "workflow" ? "1px solid #6d28d9" : "1px solid #e2e8f0",
-            padding: "6px 14px",
-            borderRadius: 7,
-            fontSize: 12,
-            fontWeight: activeCategory === "workflow" ? 700 : 500,
-            cursor: "pointer",
-            boxShadow: activeCategory === "workflow" ? "0 2px 8px rgba(124, 58, 237, 0.3)" : "none",
-            transition: "all 0.14s ease"
-          }}
-        >
-          Workflow Changes
-        </button>
-
-        <button
-          onClick={() => setActiveCategory("bugs")}
-          style={{
-            background: activeCategory === "bugs" ? "linear-gradient(135deg, #e11d48 0%, #be123c 100%)" : "#f8fafc",
-            color: activeCategory === "bugs" ? "#ffffff" : "#475569",
-            border: activeCategory === "bugs" ? "1px solid #be123c" : "1px solid #e2e8f0",
-            padding: "6px 14px",
-            borderRadius: 7,
-            fontSize: 12,
-            fontWeight: activeCategory === "bugs" ? 700 : 500,
-            cursor: "pointer",
-            boxShadow: activeCategory === "bugs" ? "0 2px 8px rgba(225, 29, 72, 0.3)" : "none",
-            transition: "all 0.14s ease"
-          }}
-        >
-          Real Bugs (Must Fail)
-        </button>
-      </div>
-
       {/* Grid of 8 Scenario Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 18 }}>
-        {filteredScenarios.map(sc => {
+        {scenarios.map(sc => {
           const isRunning = runningId === sc.id;
           const isHealable = sc.expected === "HEALED";
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { RunDetail } from "../types.js";
 import { StatusBadge } from "../components/StatusBadge.js";
 import { commitHeal } from "../api.js";
@@ -34,6 +34,10 @@ export const RunExplorerView: React.FC<Props> = ({
   const [committing, setCommitting] = useState(false);
   const [commitStatus, setCommitStatus] = useState<string | null>(null);
 
+  useEffect(() => {
+    setSelectedStepId(null);
+  }, [runDetail?.run.id]);
+
   if (!runDetail) {
     return (
       <div style={{ maxWidth: 900, margin: "60px auto", padding: "40px 24px", textAlign: "center" }}>
@@ -64,8 +68,11 @@ export const RunExplorerView: React.FC<Props> = ({
     steps[0];
 
   // Artifacts for current step
-  const stepArtifacts = artifacts.filter(a => !a.step_id || a.step_id === activeStep?.step_id);
-  const screenshotArtifact = stepArtifacts.find(a => a.artifact_type === "screenshot") || artifacts.find(a => a.artifact_type === "screenshot");
+  const stepArtifacts = artifacts
+    .filter(a => a.step_id === activeStep?.step_id)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const screenshotArtifact = stepArtifacts.find(a => a.artifact_type === "screenshot");
+  const domArtifact = stepArtifacts.find(a => a.artifact_type === "dom_snapshot");
 
   // Recovery attempt for this step
   const recoveryAttempt = recoveryAttempts.find(r => r.step_id === activeStep?.step_id) || recoveryAttempts[0];
@@ -93,6 +100,12 @@ export const RunExplorerView: React.FC<Props> = ({
   // Failure and verifier events
   const failureEvent = events.find(e => e.type === "FAILURE_CLASSIFIED");
   const verifierEvents = events.filter(e => e.type === "VERIFICATION_CHECK_PASSED" || e.type === "VERIFICATION_CHECK_FAILED");
+  const failedVerifierEvents = verifierEvents.filter(e => e.type === "VERIFICATION_CHECK_FAILED");
+  const verificationStarted = events.some(e => e.type === "VERIFICATION_STARTED");
+  const recoveryStarted = events.find(e => e.type === "RECOVERY_STARTED");
+  const evidenceEvent = [...events].reverse().find(e =>
+    e.type === "EVIDENCE_CAPTURED" && e.payload.stepId === activeStep?.step_id
+  );
 
   return (
     <div style={{ height: "calc(100vh - 65px)", display: "flex", flexDirection: "column" }}>
@@ -303,11 +316,24 @@ export const RunExplorerView: React.FC<Props> = ({
                 Playwright Viewport Evidence Capture
               </h3>
               <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                Real browser viewport screenshot captured during Playwright execution milestone.
+                Real browser viewport captured for this Playwright step attempt.
               </p>
             </div>
 
-            {screenshotArtifact && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {domArtifact && (
+                <a
+                  href={`/api/runs/${run.id}/artifacts/${domArtifact.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary"
+                  style={{ fontSize: 11, padding: "5px 12px" }}
+                >
+                  <FileCode2 size={12} color="#4f46e5" />
+                  <span>Open DOM Snapshot</span>
+                </a>
+              )}
+              {screenshotArtifact && (
               <a
                 href={`/api/runs/${run.id}/artifacts/${screenshotArtifact.id}`}
                 target="_blank"
@@ -318,7 +344,8 @@ export const RunExplorerView: React.FC<Props> = ({
                 <ExternalLink size={12} color="#4f46e5" />
                 <span>Open Fullscreen PNG</span>
               </a>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Actual Viewport Image */}
@@ -338,7 +365,9 @@ export const RunExplorerView: React.FC<Props> = ({
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }}></span>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }}></span>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }}></span>
-                <span style={{ marginLeft: 6, color: "#4f46e5", fontWeight: 600 }}>http://localhost:3001/checkout</span>
+                <span style={{ marginLeft: 6, color: "#4f46e5", fontWeight: 600 }}>
+                  Playwright Chromium • {activeStep?.step_name || "No step selected"} • Attempt {activeStep?.attempt_number || 1}
+                </span>
               </div>
               <img
                 src={`/api/runs/${run.id}/artifacts/${screenshotArtifact.id}`}
@@ -348,7 +377,9 @@ export const RunExplorerView: React.FC<Props> = ({
             </div>
           ) : (
             <div className="card-clean" style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", marginBottom: 20 }}>
-              No failure screenshot captured for this step (step passed clean without triggering evidence recorder).
+              {evidenceEvent?.payload.captureFailed
+                ? "Evidence capture failed for this attempt. Check the run events for artifact recorder details."
+                : `No screenshot was recorded for ${activeStep?.step_name || "this step"} in this run. Earlier runs do not create retroactive evidence.`}
             </div>
           )}
 
@@ -447,8 +478,27 @@ export const RunExplorerView: React.FC<Props> = ({
                   </div>
                 </>
               ) : (
-                <div className="card-clean" style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>
-                  No failure classified. Test executed cleanly without triggering diagnostic intervention.
+                <div className="card-clean" style={{ padding: 16, borderLeft: `4px solid ${run.status === "FAILED" ? "#e11d48" : "#2563eb"}` }}>
+                  <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 6, fontWeight: 700, letterSpacing: "0.05em" }}>
+                    {run.status === "FAILED" ? "Run failed" : "No classified step failure"}
+                  </div>
+                  {run.error_code && (
+                    <div style={{ fontSize: 12, color: "#be123c", fontFamily: "var(--font-mono)", fontWeight: 700, marginBottom: 6 }}>
+                      {run.error_code}
+                    </div>
+                  )}
+                  <p style={{ fontSize: 12, color: "var(--text-primary)", lineHeight: 1.5 }}>
+                    {run.final_summary || activeStep?.error_summary || (run.status === "FAILED"
+                      ? "The run failed without a persisted summary. Inspect Raw Events and the failed step evidence."
+                      : "No step failure was classified for this run.")}
+                  </p>
+                  {failedVerifierEvents.length > 0 && (
+                    <ul style={{ paddingLeft: 18, marginTop: 10, fontSize: 12, color: "#be123c", display: "flex", flexDirection: "column", gap: 5 }}>
+                      {failedVerifierEvents.map((event) => (
+                        <li key={event.id}>{event.payload.description}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
             </div>
@@ -526,7 +576,16 @@ export const RunExplorerView: React.FC<Props> = ({
                 </>
               ) : (
                 <div className="card-clean" style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>
-                  No recovery attempt needed for this step.
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                    {recoveryStarted ? "Recovery started, but no policy attempt was persisted." : "No recovery attempt was recorded."}
+                  </div>
+                  <p style={{ fontSize: 12, lineHeight: 1.5 }}>
+                    {recoveryStarted
+                      ? recoveryStarted.payload.intent || recoveryStarted.payload.reason || "Inspect Raw Events for the last recorded recovery phase."
+                      : failedVerifierEvents.length > 0
+                        ? `The workflow reached verification; locator recovery was not needed. The oracle reported: ${failedVerifierEvents.map(event => event.payload.description).join("; ")}`
+                        : failureEvent?.payload.reason || run.final_summary || "No failed locator or recovery event was recorded for this run."}
+                  </p>
                 </div>
               )}
             </div>
@@ -540,7 +599,11 @@ export const RunExplorerView: React.FC<Props> = ({
               </div>
               {verifierEvents.length === 0 ? (
                 <div className="card-clean" style={{ padding: 20, textAlign: "center", color: "var(--text-tertiary)" }}>
-                  Oracle verifier has not recorded assertions for this run yet.
+                  {verificationStarted
+                    ? "Oracle verification started, but no check results were persisted. Inspect Raw Events for the run outcome."
+                    : ["FAILED", "REVIEW_REQUIRED"].includes(run.status)
+                      ? run.final_summary || run.error_code || "The run ended before oracle checks were recorded."
+                      : "Oracle verification has not started for this run yet."}
                 </div>
               ) : (
                 verifierEvents.map((ev, idx) => {

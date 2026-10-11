@@ -25,7 +25,6 @@ import { LiveExecutionOverlay, LiveEventItem } from "./components/shared/LiveExe
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
-  const [selectedStoryStep, setSelectedStoryStep] = useState<number>(1);
 
   const [tests, setTests] = useState<any[]>([]);
   const [activeTestId, setActiveTestId] = useState<string>("checkout-valid-card");
@@ -115,40 +114,9 @@ export const App: React.FC = () => {
     }
   }, [selectedRunId]);
 
-  // Handle Showcase Story Navigation
-  const handleSelectStoryStep = (step: number) => {
-    setSelectedStoryStep(step);
-    switch (step) {
-      case 1:
-        setActiveTab("overview");
-        break;
-      case 2:
-        setActiveTab("tests");
-        break;
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-      case 9:
-        setActiveTab("runs");
-        break;
-      case 8:
-        setActiveTab("mutation-lab");
-        break;
-      default:
-        setActiveTab("overview");
-    }
-  };
-
   // Handle Tab selection from Sidebar
   const handleSelectTab = (tab: TabId) => {
     setActiveTab(tab);
-    if (tab === "overview") setSelectedStoryStep(1);
-    else if (tab === "tests") setSelectedStoryStep(2);
-    else if (tab === "runs") setSelectedStoryStep(3);
-    else if (tab === "mutation-lab") setSelectedStoryStep(8);
-    else if (tab === "demo-app") setSelectedStoryStep(9);
   };
 
   // Run execution with real-time SSE stream
@@ -269,8 +237,6 @@ export const App: React.FC = () => {
         <TopHeader
           onRunDemoTest={() => handleRunTest(activeTestId)}
           isRunning={isRunningTest}
-          selectedStoryStep={selectedStoryStep}
-          onSelectStoryStep={handleSelectStoryStep}
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
         />
@@ -288,11 +254,9 @@ export const App: React.FC = () => {
               }}
               onOpenTestEditor={() => {
                 setActiveTab("tests");
-                setSelectedStoryStep(2);
               }}
               onOpenMutationLab={() => {
                 setActiveTab("mutation-lab");
-                setSelectedStoryStep(8);
               }}
               onRunBaseline={() => handleRunTest(activeTestId)}
               onClearRuns={handleClearRuns}
