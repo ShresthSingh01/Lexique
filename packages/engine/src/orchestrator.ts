@@ -108,10 +108,16 @@ export class RunOrchestrator {
       // 1. Reset demo fixtures and set active mutation
       await this.resetDemoState();
 
-      // 2. Launch Chromium browser
+      // 2. Launch Chromium browser with real-time visual observer support
       this.browser = await chromium.launch({
         headless: CONFIG.headless,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+        slowMo: CONFIG.headless ? 0 : 350,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--window-size=1280,850",
+          "--window-position=40,40"
+        ]
       });
       this.context = await this.browser.newContext({
         viewport: { width: 1280, height: 800 }
@@ -364,6 +370,20 @@ export class RunOrchestrator {
           case "click": {
             // Find element with bounded timeout
             await page.waitForSelector(effectiveSelector, { timeout: step.timeoutMs, state: "visible" });
+            // Visual Interaction Highlighter: outline element with glowing color before click
+            try {
+              await page.evaluate((sel) => {
+                const el = document.querySelector(sel) as HTMLElement | null;
+                if (el) {
+                  el.style.outline = "3px solid #6366f1";
+                  el.style.boxShadow = "0 0 16px rgba(99, 102, 241, 0.9)";
+                  el.style.transition = "all 0.15s ease";
+                }
+              }, effectiveSelector);
+              if (!CONFIG.headless) {
+                await page.waitForTimeout(250);
+              }
+            } catch {}
             await page.click(effectiveSelector, { timeout: step.timeoutMs });
             // Brief pause for DOM transition
             await page.waitForTimeout(400);
@@ -372,6 +392,20 @@ export class RunOrchestrator {
 
           case "fill": {
             await page.waitForSelector(effectiveSelector, { timeout: step.timeoutMs, state: "visible" });
+            // Visual Input Highlighter: outline input field with emerald glow
+            try {
+              await page.evaluate((sel) => {
+                const el = document.querySelector(sel) as HTMLElement | null;
+                if (el) {
+                  el.style.outline = "3px solid #10b981";
+                  el.style.boxShadow = "0 0 16px rgba(16, 185, 129, 0.9)";
+                  el.style.transition = "all 0.15s ease";
+                }
+              }, effectiveSelector);
+              if (!CONFIG.headless) {
+                await page.waitForTimeout(200);
+              }
+            } catch {}
             await page.fill(effectiveSelector, step.inputValue || "", { timeout: step.timeoutMs });
             break;
           }

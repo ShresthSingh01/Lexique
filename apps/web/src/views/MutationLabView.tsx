@@ -9,9 +9,12 @@ import {
   Database,
   CheckCircle2,
   AlertOctagon,
-  ArrowRight
+  ArrowRight,
+  GitCompare,
+  X
 } from "lucide-react";
 import { BenchmarkMetrics, MutationScenario } from "../types.js";
+import { VersionSplitView } from "../components/shared/VersionSplitView.js";
 
 interface Props {
   mutations?: MutationScenario[];
@@ -30,6 +33,7 @@ export const MutationLabView: React.FC<Props> = ({
 }) => {
   const [runningId, setRunningId] = useState<string | null>(null);
   const [resetting, setResetting] = useState<boolean>(false);
+  const [previewScenarioId, setPreviewScenarioId] = useState<string | null>(null);
 
   // Synchronized with packages/engine/src/seed.ts MUTATION_SCENARIOS
   const scenarios = [
@@ -260,40 +264,184 @@ export const MutationLabView: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* Action Button */}
-              <button
-                className="btn btn-primary"
-                onClick={() => handleRun(sc.id)}
-                disabled={isRunning}
-                style={{
-                  width: "100%",
-                  background: isHealable
-                    ? "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)"
-                    : (sc.expected === "REVIEW_REQUIRED"
-                      ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)"
-                      : "linear-gradient(135deg, #e11d48 0%, #be123c 100%)"),
-                  borderColor: isHealable ? "#4338ca" : (sc.expected === "REVIEW_REQUIRED" ? "#6d28d9" : "#be123c"),
-                  boxShadow: isHealable ? "0 2px 8px rgba(79, 70, 229, 0.3)" : "0 2px 8px rgba(225, 29, 72, 0.3)",
-                  fontSize: 12,
-                  padding: "8px 14px"
-                }}
-              >
-                {isRunning ? (
-                  <>
-                    <RotateCw size={13} className="pulsing-dot" />
-                    <span>Executing Live Run in Playwright...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play size={13} fill="#ffffff" />
-                    <span>Inject Mutation & Run Test</span>
-                  </>
-                )}
-              </button>
+              {/* Action Buttons Row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setPreviewScenarioId(sc.id)}
+                  style={{
+                    fontSize: 12,
+                    padding: "8px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6
+                  }}
+                  title="View side-by-side Version A vs Version B comparison"
+                >
+                  <GitCompare size={13} color="#4f46e5" />
+                  <span>A/B Split Diff</span>
+                </button>
+
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleRun(sc.id)}
+                  disabled={isRunning}
+                  style={{
+                    background: isHealable
+                      ? "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)"
+                      : (sc.expected === "REVIEW_REQUIRED"
+                        ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)"
+                        : "linear-gradient(135deg, #e11d48 0%, #be123c 100%)"),
+                    borderColor: isHealable ? "#4338ca" : (sc.expected === "REVIEW_REQUIRED" ? "#6d28d9" : "#be123c"),
+                    boxShadow: isHealable ? "0 2px 8px rgba(79, 70, 229, 0.3)" : "0 2px 8px rgba(225, 29, 72, 0.3)",
+                    fontSize: 12,
+                    padding: "8px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6
+                  }}
+                >
+                  {isRunning ? (
+                    <>
+                      <RotateCw size={13} className="pulsing-dot" />
+                      <span>Running...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={13} fill="#ffffff" />
+                      <span>Inject & Run</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
+
+      {/* A/B Split Comparison Modal */}
+      {previewScenarioId && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(15, 23, 42, 0.65)",
+          backdropFilter: "blur(4px)",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24
+        }}>
+          <div style={{
+            background: "#ffffff",
+            borderRadius: 12,
+            border: "1px solid var(--border-light)",
+            boxShadow: "0 20px 45px rgba(15, 23, 42, 0.25)",
+            width: "100%",
+            maxWidth: 1180,
+            maxHeight: "92vh",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden"
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: "16px 20px",
+              borderBottom: "1px solid var(--border-light)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              background: "#f8fafc"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: "#eef2ff",
+                  border: "1px solid #c7d2fe",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}>
+                  <GitCompare size={16} color="#4f46e5" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
+                    Version A vs Version B Semantic Drift & Markup Split
+                  </h3>
+                  <p style={{ fontSize: 11, color: "var(--text-secondary)", margin: 0 }}>
+                    Comparing Contract Baseline vs Mutated Application DOM, Locators, and State
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <select
+                  value={previewScenarioId}
+                  onChange={(e) => setPreviewScenarioId(e.target.value)}
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    border: "1px solid var(--border-medium)",
+                    background: "#ffffff",
+                    color: "var(--text-primary)"
+                  }}
+                >
+                  {scenarios.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const idToRun = previewScenarioId;
+                    setPreviewScenarioId(null);
+                    handleRun(idToRun);
+                  }}
+                  disabled={runningId === previewScenarioId}
+                  style={{ fontSize: 12, padding: "6px 14px" }}
+                >
+                  <Play size={12} fill="#ffffff" />
+                  <span>Execute in Playwright</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewScenarioId(null)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    padding: 6,
+                    borderRadius: 6,
+                    color: "var(--text-secondary)",
+                    display: "flex",
+                    alignItems: "center"
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body with VersionSplitView */}
+            <div style={{
+              padding: "20px 24px",
+              overflowY: "auto",
+              flex: 1
+            }}>
+              <VersionSplitView scenarioId={previewScenarioId} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
