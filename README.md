@@ -1,8 +1,8 @@
-# IntentLock — Evidence-Gated Self-Healing E2E Tests
+# Ojastra — Evidence-Gated Self-Healing E2E Tests
 
 > **"The UI may change. The test's definition of correctness must not change just to make a test green."**
 
-IntentLock is a self-healing end-to-end testing workbench. It executes known browser workflows deterministically using Playwright, detects interface drift, leverages an AI-assisted recovery adapter to propose constrained candidate actions, verifies proposed actions via deterministic policy gates, replays from clean test fixtures, and verifies the original test outcome independently.
+Ojastra is a self-healing end-to-end testing workbench. It executes known browser workflows deterministically using Playwright, detects interface drift, leverages an AI-assisted recovery adapter to propose constrained candidate actions, verifies proposed actions via deterministic policy gates, replays from clean test fixtures, and verifies the original test outcome independently.
 
 ---
 
@@ -91,7 +91,7 @@ LLM_PROVIDER=mistral
 MISTRAL_API_KEY=your_key_here
 LLM_MODEL=mistral-small-latest
 STORAGE_DIR=./storage
-DATABASE_PATH=./storage/intentlock.db
+DATABASE_PATH=./storage/ojastra.db
 ```
 
 ### 3. Install & Build
@@ -147,7 +147,7 @@ Open **http://localhost:5173** in your browser.
 3. **Refusal to Heal Real Regressions (60s):**
    - In Mutation Lab, click **Run Scenario** on `M06_WRONG_TOTAL` (Backend computes $64 instead of $54).
    - Observe engine strictly fails with **FAILED** (`VERIFIER_CONDITION_FAILED`).
-   - Explain that IntentLock refuses to make a real defect green.
+   - Explain that Ojastra refuses to make a real defect green.
 4. **Ambiguity Safe Abstention (45s):**
    - Run `M05_DUPLICATE_LABEL`.
    - Engine detects 2 identical buttons and transitions safely to **REVIEW_REQUIRED** without guessing.

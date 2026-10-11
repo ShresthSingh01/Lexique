@@ -194,7 +194,7 @@ export const MutationLabView: React.FC<Props> = ({
             lineHeight: 1.6
           }}>
             Inject real DOM changes and application bugs into the local ShopMart store.
-            Watch IntentLock auto-heal benign UI drift in seconds, and strictly refuse to heal real business regressions.
+            Watch Ojastra auto-heal benign UI drift in seconds, and strictly refuse to heal real business regressions.
           </p>
         </div>
 

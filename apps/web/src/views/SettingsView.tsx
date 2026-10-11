@@ -9,7 +9,7 @@ export const SettingsView: React.FC = () => {
           Workbench Settings & Policy Configuration
         </h1>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-          Tune IntentLock heuristic thresholds, database verification rules, and healing policies
+          Tune Ojastra heuristic thresholds, database verification rules, and healing policies
         </p>
       </div>
 

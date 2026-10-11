@@ -38,7 +38,7 @@ export const Header: React.FC<Props> = ({ activeTab, setActiveTab, onRunBaseline
           </div>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.01em", color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
-              IntentLock
+              Ojastra
             </div>
             <div style={{ fontSize: 10, color: "var(--accent-gold)", fontFamily: "var(--font-mono)", letterSpacing: "0.08em", fontWeight: 600 }}>
               EVIDENCE-GATED E2E ORACLE

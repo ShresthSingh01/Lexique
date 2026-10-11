@@ -144,7 +144,7 @@ class DemoStore {
       status: orderStatus,
       paymentStatus,
       customerName: details.customerName || "Alex Tester",
-      customerEmail: details.customerEmail || "alex@intentlock.internal",
+      customerEmail: details.customerEmail || "alex@ojastra.internal",
       idempotencyKey: details.idempotencyKey,
       createdAt: new Date().toISOString()
     };

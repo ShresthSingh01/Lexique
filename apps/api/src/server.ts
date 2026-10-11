@@ -22,7 +22,7 @@ server.get("/api/health", async () => {
   return {
     status: "ok",
     version: "1.0.0",
-    service: "intentlock-api",
+    service: "ojastra-api",
     timestamp: new Date().toISOString()
   };
 });
@@ -546,7 +546,7 @@ server.get("/api/benchmark", async () => {
 // Start Server
 try {
   await server.listen({ port: CONFIG.port, host: "0.0.0.0" });
-  console.log(`[IntentLock API] Server listening on http://localhost:${CONFIG.port}`);
+  console.log(`[Ojastra API] Server listening on http://localhost:${CONFIG.port}`);
 } catch (err) {
   server.log.error(err);
   process.exit(1);

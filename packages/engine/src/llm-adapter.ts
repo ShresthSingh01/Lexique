@@ -22,7 +22,7 @@ export class LlmAdapter {
       isUnique: c.isUnique
     }));
 
-    const systemPrompt = `You are IntentLock's autonomous test recovery policy adapter.
+    const systemPrompt = `You are Ojastra's autonomous test recovery policy adapter.
 Your job is to match a broken test step intent to a valid, observed page element candidate.
 CRITICAL SAFETY RULES:
 1. You may ONLY choose an ID from the provided observed candidate list (e.g. 'cand_01').

@@ -71,7 +71,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning }) 
             letterSpacing: "-0.02em",
             lineHeight: 1.2
           }}>
-            IntentLock
+            Ojastra
           </div>
           <div style={{
             display: "inline-block",
@@ -205,7 +205,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning }) 
                 overflow: "hidden",
                 textOverflow: "ellipsis"
               }}>
-                IntentLock Engine
+                Ojastra Engine
               </span>
               <span className="pulsing-emerald-dot" style={{ width: 5, height: 5 }} />
             </div>
