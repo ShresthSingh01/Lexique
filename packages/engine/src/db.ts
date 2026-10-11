@@ -81,6 +81,17 @@ db.exec(`
     result_status TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS human_review_decisions (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    decision TEXT NOT NULL CHECK (decision IN ('APPROVE_RETRY', 'REJECT', 'CLARIFICATION')),
+    candidate_id TEXT,
+    candidate_json TEXT,
+    note TEXT NOT NULL DEFAULT '',
+    child_run_id TEXT,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS evidence_artifacts (
     id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
@@ -112,3 +123,8 @@ db.exec(`
     enabled INTEGER NOT NULL DEFAULT 1
   );
 `);
+
+const evidenceArtifactColumns = db.prepare("PRAGMA table_info(evidence_artifacts)").all() as { name: string }[];
+if (!evidenceArtifactColumns.some(column => column.name === "attempt_number")) {
+  db.exec("ALTER TABLE evidence_artifacts ADD COLUMN attempt_number INTEGER NOT NULL DEFAULT 1");
+}

@@ -3,7 +3,8 @@ import cors from "@fastify/cors";
 import path from "node:path";
 import fs from "node:fs";
 import { CONFIG, db, seedDatabase } from "@intentlock/engine";
-import { CreateRunRequestSchema, RunEvent } from "@intentlock/contracts";
+import { CreateRunRequestSchema, ObservedCandidate, RunEvent } from "@intentlock/contracts";
+import { z } from "zod";
 import { RunQueue } from "./queue.js";
 import { SseManager } from "./sse.js";
 
@@ -11,6 +12,18 @@ import { SseManager } from "./sse.js";
 seedDatabase();
 
 const server = fastify({ logger: true });
+const HumanReviewRequestSchema = z.object({
+  decision: z.enum(["approve_retry", "reject", "clarification"]),
+  candidateId: z.string().min(1).optional(),
+  note: z.string().trim().max(2000).default("")
+}).superRefine((value, context) => {
+  if (value.decision === "approve_retry" && !value.candidateId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "candidateId is required to approve a retry." });
+  }
+  if (value.decision === "clarification" && !value.note) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A clarification note is required." });
+  }
+});
 
 await server.register(cors, {
   origin: true,
@@ -26,6 +39,10 @@ server.get("/api/health", async () => {
     timestamp: new Date().toISOString()
   };
 });
+
+server.get("/api/settings", async () => ({
+  minimumCandidateSimilarity: CONFIG.minimumCandidateSimilarity
+}));
 
 // 2. List test specs
 server.get("/api/tests", async () => {
@@ -357,7 +374,11 @@ server.get("/api/runs/:runId", async (request, reply) => {
 
   const steps = db.prepare("SELECT * FROM run_steps WHERE run_id = ? ORDER BY started_at ASC").all(runId);
   const events = db.prepare("SELECT * FROM run_events WHERE run_id = ? ORDER BY sequence_no ASC").all(runId).map((e: any) => ({
-    ...e,
+    id: e.id,
+    runId: e.run_id,
+    sequenceNo: e.sequence_no,
+    type: e.event_type,
+    timestamp: e.timestamp,
     payload: JSON.parse(e.payload_json)
   }));
   const recoveryAttempts = db.prepare("SELECT * FROM recovery_attempts WHERE run_id = ?").all(runId).map((r: any) => ({
@@ -366,6 +387,12 @@ server.get("/api/runs/:runId", async (request, reply) => {
     proposal: JSON.parse(r.proposal_json),
     reasonCodes: JSON.parse(r.policy_reason_codes_json)
   }));
+  const humanReviews = db.prepare(`
+    SELECT id, run_id, decision, candidate_id, note, child_run_id, created_at
+    FROM human_review_decisions
+    WHERE run_id = ?
+    ORDER BY created_at ASC
+  `).all(runId);
   const artifacts = db.prepare("SELECT * FROM evidence_artifacts WHERE run_id = ?").all(runId);
 
   return {
@@ -373,8 +400,128 @@ server.get("/api/runs/:runId", async (request, reply) => {
     steps,
     events,
     recoveryAttempts,
+    humanReviews,
     artifacts
   };
+});
+
+server.post("/api/runs/:runId/review", async (request, reply) => {
+  const { runId } = request.params as { runId: string };
+  const parsed = HumanReviewRequestSchema.safeParse(request.body);
+  if (!parsed.success) {
+    return reply.status(400).send({
+      code: "INVALID_REVIEW",
+      message: "Review decision is invalid.",
+      details: parsed.error.format()
+    });
+  }
+
+  const run = db.prepare("SELECT * FROM test_runs WHERE id = ?").get(runId) as any;
+  if (!run) return reply.status(404).send({ code: "RUN_NOT_FOUND", message: "Run not found." });
+  if (run.status !== "REVIEW_REQUIRED") {
+    return reply.status(409).send({ code: "RUN_NOT_REVIEWABLE", message: "Only REVIEW_REQUIRED runs can receive a human decision." });
+  }
+  const previousApproval = db.prepare(`
+    SELECT id FROM human_review_decisions
+    WHERE run_id = ? AND decision = 'APPROVE_RETRY'
+    LIMIT 1
+  `).get(runId);
+  if (previousApproval) {
+    return reply.status(409).send({ code: "RETRY_ALREADY_APPROVED", message: "A retry has already been approved for this run." });
+  }
+
+  const { decision, candidateId, note } = parsed.data;
+  let selectedCandidate: ObservedCandidate | undefined;
+  let approvedStepId: string | undefined;
+  if (decision === "approve_retry") {
+    const attempt = db.prepare(`
+      SELECT step_id, candidate_set_json
+      FROM recovery_attempts
+      WHERE run_id = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(runId) as { step_id: string; candidate_set_json: string } | undefined;
+    if (!attempt) {
+      return reply.status(409).send({ code: "NO_REVIEW_CANDIDATES", message: "This run has no observed recovery candidates to approve." });
+    }
+    const candidates = JSON.parse(attempt.candidate_set_json) as ObservedCandidate[];
+    selectedCandidate = candidates.find(candidate => candidate.candidateId === candidateId);
+    if (!selectedCandidate) {
+      return reply.status(400).send({ code: "CANDIDATE_NOT_OBSERVED", message: "The selected candidate was not observed for this run." });
+    }
+    if (!selectedCandidate.isVisible || !selectedCandidate.isEnabled || !selectedCandidate.isUnique) {
+      return reply.status(400).send({ code: "CANDIDATE_NOT_SAFE", message: "Only visible, enabled, unique observed candidates can be approved for a retry." });
+    }
+    approvedStepId = attempt.step_id;
+  }
+
+  const reviewId = `review_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const now = new Date().toISOString();
+  let childRunId: string | undefined;
+  if (decision === "approve_retry" && selectedCandidate && approvedStepId) {
+    childRunId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  }
+  const storedDecision = decision === "approve_retry" ? "APPROVE_RETRY" : decision === "reject" ? "REJECT" : "CLARIFICATION";
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare(`
+      INSERT INTO human_review_decisions
+        (id, run_id, decision, candidate_id, candidate_json, note, child_run_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      reviewId,
+      runId,
+      storedDecision,
+      selectedCandidate?.candidateId || null,
+      selectedCandidate ? JSON.stringify(selectedCandidate) : null,
+      note,
+      childRunId || null,
+      now
+    );
+    if (childRunId) {
+      db.prepare(`
+        INSERT INTO test_runs
+          (id, test_id, contract_version, status, trigger_source, mutation_scenario_id, started_at, recovery_count, idempotency_key, parent_run_id)
+        VALUES (?, ?, ?, 'QUEUED', 'workbench', ?, ?, 0, ?, ?)
+      `).run(
+        childRunId,
+        run.test_id,
+        run.contract_version,
+        run.mutation_scenario_id,
+        now,
+        reviewId,
+        runId
+      );
+      db.prepare("UPDATE human_review_decisions SET child_run_id = ? WHERE id = ?").run(childRunId, reviewId);
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  if (childRunId && selectedCandidate && approvedStepId) {
+    RunQueue.enqueue({
+      runId: childRunId,
+      testId: run.test_id,
+      contractVersion: run.contract_version,
+      mutationScenarioId: run.mutation_scenario_id,
+      parentRunId: runId,
+      approvedStepId,
+      approvedCandidate: selectedCandidate,
+      reviewDecisionId: reviewId
+    });
+  }
+
+  return reply.status(childRunId ? 202 : 201).send({
+    reviewDecisionId: reviewId,
+    decision: storedDecision,
+    childRunId: childRunId || null,
+    message: childRunId
+      ? "Approval recorded. A linked retry is queued; fresh candidate and contract checks still apply."
+      : "Human review feedback recorded."
+  });
 });
 
 // 7. SSE Events Stream
@@ -444,6 +591,7 @@ server.post("/api/runs/clear", async () => {
     DELETE FROM run_steps;
     DELETE FROM run_events;
     DELETE FROM recovery_attempts;
+    DELETE FROM human_review_decisions;
     DELETE FROM evidence_artifacts;
   `);
 

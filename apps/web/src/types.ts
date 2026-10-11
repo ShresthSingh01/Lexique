@@ -12,6 +12,7 @@ export interface TestRun {
   error_code: string | null;
   recovery_count: number;
   idempotency_key?: string;
+  parent_run_id?: string | null;
 }
 
 export interface RunStep {
@@ -63,6 +64,7 @@ export interface EvidenceArtifact {
   id: string;
   run_id: string;
   step_id?: string;
+  attempt_number?: number;
   artifact_type: string;
   relative_path: string;
   mime_type: string;
@@ -74,7 +76,18 @@ export interface RunDetail {
   steps: RunStep[];
   events: RunEvent[];
   recoveryAttempts: RecoveryAttempt[];
+  humanReviews: HumanReviewDecision[];
   artifacts: EvidenceArtifact[];
+}
+
+export interface HumanReviewDecision {
+  id: string;
+  run_id: string;
+  decision: "APPROVE_RETRY" | "REJECT" | "CLARIFICATION";
+  candidate_id: string | null;
+  note: string;
+  child_run_id: string | null;
+  created_at: string;
 }
 
 export interface MutationScenario {

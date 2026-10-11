@@ -23,6 +23,16 @@
 
 ## 📌 Overview
 
+Unlike generic AI browser agents or selector-guessing wrappers:
+1. **Immutable Intent Contract:** The definition of correctness (preconditions, invariants, success assertions) is versioned and locked. AI recovery is prohibited from softening assertions or inventing arbitrary workflows.
+2. **Rule-First Failure Classification:** Distinguishes harmless locator drift from real application faults, network 5xx errors, or business invariant violations before invoking recovery.
+3. **Stagehand Candidate Discovery + Constrained LLM Selection:** Stagehand extracts observed page elements into an enumerated candidate list. The LLM must select from observed candidates or return `NO_SAFE_MATCH`. It never writes arbitrary selectors or executes unconstrained code.
+4. **Deterministic Policy Gate:** Checks uniqueness, interactability, semantic role compatibility, attempt bounds, and sandbox risk rules before any action is executed.
+5. **Clean Fixture Replay:** A proposal is never marked healed on partial state. The entire test replays from a clean baseline with one bounded step override.
+6. **Independent Outcome Verifier:** Success is verified independently against both the UI confirmation page and the backend order database (SKU, quantity, tax, total, payment status, and duplicate submission checks).
+7. **Refusal to Heal Real Regressions:** Seeded business logic errors (incorrect totals, payment failure, backend 503) are strictly preserved as `FAILED` (0 false heals).
+8. **Audited Human Review:** A reviewer can approve a retry, reject a candidate, or request clarification. Approval queues a linked retry and never bypasses fresh candidate checks or contract verification.
+
 **Ojastra** is a deterministic, self-healing end-to-end testing workbench designed for mission-critical web applications. Unlike traditional testing tools that fail on minor locator changes or unconstrained AI agents that hallucinate invalid actions, Ojastra enforces **immutable intent contracts**, **rule-first failure diagnostics**, **constrained candidate discovery**, **deterministic policy gating**, **clean fixture replays**, and **independent dual-layer test oracles**.
 
 When an interface drifts, Ojastra never soft-pedals correctness or modifies test assertions. If the drift is harmless (e.g. a renamed button or restructured DOM layout), it discovers visible candidates, selects the matching action, verifies it against 7 strict safety rules, resets test fixtures, replays the workflow from a clean baseline, and independently checks both UI banners and backend database state. If the failure is a real defect (such as an incorrect pricing calculation or payment error), Ojastra strictly refuses to heal and fails closed.
@@ -196,6 +206,46 @@ d:/LEXIQUE/
 
 ---
 
+## ⚡ Quick Start
+
+### 1. Prerequisites
+- **Node.js**: v20+ or v24+
+- **pnpm**: v9+ or v10+
+- **Playwright Chromium**: installed via `npx playwright install chromium`
+
+### 2. Setup Environment
+```bash
+cp .env.example .env
+```
+Configure your `.env` (Mistral or OpenAI compatible):
+```env
+PORT=3000
+DEMO_PORT=3001
+WEB_PORT=5173
+LLM_PROVIDER=mistral
+MISTRAL_API_KEY=your_key_here
+LLM_MODEL=mistral-small-latest
+STORAGE_DIR=./storage
+DATABASE_PATH=./storage/intentlock.db
+MIN_CANDIDATE_SIMILARITY=0.85
+```
+
+`MIN_CANDIDATE_SIMILARITY` is the single semantic auto-acceptance cutoff for both local and cloud proposal providers. A candidate below the configured value requires human review. The Settings screen reads the effective value from the API.
+
+### 3. Install & Build
+```bash
+pnpm install
+pnpm build
+```
+
+### 4. Run the Stack
+```bash
+# Starts demo-app (3001), API (3000), and Workbench Web UI (5173) concurrently:
+pnpm dev
+```
+Open **http://localhost:5173** in your browser.
+
+---
 ## 🧪 Mutation Lab Scenario Catalog
 
 Ojastra is evaluated against 8 real mutation scenarios implemented in the demo application (`demo-app/src/server.ts`). Each scenario tests a distinct category of interface drift or backend defect:

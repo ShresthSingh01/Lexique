@@ -1,7 +1,17 @@
-import React from "react";
-import { Settings, ShieldCheck, Sliders, Database, Cpu } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { ShieldCheck, Cpu } from "lucide-react";
+import { fetchSettings } from "../api.js";
 
 export const SettingsView: React.FC = () => {
+  const [minimumSimilarity, setMinimumSimilarity] = useState<number | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchSettings()
+      .then(settings => setMinimumSimilarity(settings.minimumCandidateSimilarity))
+      .catch(error => setSettingsError(error.message));
+  }, []);
+
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 32px" }}>
       <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid var(--border-light)" }}>
@@ -51,14 +61,16 @@ export const SettingsView: React.FC = () => {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-                  Minimum Semantic Cosine Similarity Threshold
+                  Candidate auto-acceptance threshold
                 </div>
                 <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-                  Discard candidate elements with confidence lower than 0.85
+                  Candidates below this semantic similarity require human approval before a retry
                 </div>
               </div>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "#2563eb" }}>
-                0.85 (Strict)
+                {minimumSimilarity === null
+                  ? settingsError || "Loading policy…"
+                  : `${minimumSimilarity.toFixed(2)} (server policy)`}
               </span>
             </div>
           </div>

@@ -7,6 +7,12 @@ export async function fetchHealth(): Promise<{ status: string; version: string }
   return res.json();
 }
 
+export async function fetchSettings(): Promise<{ minimumCandidateSimilarity: number }> {
+  const res = await fetch(`${BASE}/settings`);
+  if (!res.ok) throw new Error(`Unable to load policy settings (HTTP ${res.status}).`);
+  return res.json();
+}
+
 export async function fetchTests(): Promise<any[]> {
   const res = await fetch(`${BASE}/tests`);
   return res.json();
@@ -90,6 +96,22 @@ export async function commitHeal(testId: string, stepId: string, newLocator: str
     body: JSON.stringify({ stepId, newLocator, runId })
   });
   return res.json();
+}
+
+export async function submitHumanReview(
+  runId: string,
+  payload: { decision: "approve_retry" | "reject" | "clarification"; candidateId?: string; note?: string }
+): Promise<{ reviewDecisionId: string; childRunId: string | null; message: string }> {
+  const res = await fetch(`${BASE}/runs/${runId}/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    throw new Error(body.message || `Unable to record review (HTTP ${res.status}).`);
+  }
+  return body;
 }
 
 export async function fetchMutations(): Promise<MutationScenario[]> {

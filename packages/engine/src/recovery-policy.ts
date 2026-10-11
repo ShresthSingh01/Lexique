@@ -4,6 +4,7 @@ import {
   RecoveryProposal,
   WorkflowStep
 } from "@intentlock/contracts";
+import { CONFIG } from "./config.js";
 import { SemanticVectorEngine } from "./semantic-vsm.js";
 
 export class RecoveryPolicyGate {
@@ -15,9 +16,12 @@ export class RecoveryPolicyGate {
     proposal: RecoveryProposal,
     candidates: ObservedCandidate[],
     step: WorkflowStep,
-    attemptNumber: number = 1
+    attemptNumber: number = 1,
+    minimumSimilarity: number = CONFIG.minimumCandidateSimilarity,
+    humanApprovedCandidateId?: string
   ): PolicyEvaluationResult {
     const reasonCodes: string[] = [];
+    const rankedCandidates = SemanticVectorEngine.rankCandidates(step.intent, candidates);
 
     // Rule 1: Rejection if model proposed NO_SAFE_MATCH
     if (proposal.decision === "NO_SAFE_MATCH" || !proposal.targetCandidateId) {
@@ -25,7 +29,10 @@ export class RecoveryPolicyGate {
       return {
         decision: "REVIEW_REQUIRED",
         reasonCodes,
-        explanation: proposal.rationale || "The recovery model determined that no candidate safely matches step intent."
+        explanation: proposal.rationale || "The recovery model determined that no candidate safely matches step intent.",
+        similarityScore: rankedCandidates[0]?.similarity,
+        minimumSimilarity,
+        humanApproved: false
       };
     }
 
@@ -50,6 +57,10 @@ export class RecoveryPolicyGate {
       };
     }
     reasonCodes.push("CANDIDATE_EXISTS");
+    const rankedCandidate = rankedCandidates
+      .find(item => item.candidateId === candidate.candidateId);
+    const similarityScore = rankedCandidate?.similarity ?? 0;
+    const humanApproved = candidate.candidateId === humanApprovedCandidateId;
 
     // Rule 4: Candidate must be visible and enabled
     if (!candidate.isVisible || !candidate.isEnabled) {
@@ -57,7 +68,10 @@ export class RecoveryPolicyGate {
       return {
         decision: "REJECTED",
         reasonCodes,
-        explanation: `Candidate '${candidate.candidateId}' is hidden or disabled in DOM.`
+        explanation: `Candidate '${candidate.candidateId}' is hidden or disabled in DOM.`,
+        similarityScore,
+        minimumSimilarity,
+        humanApproved
       };
     }
     reasonCodes.push("CANDIDATE_INTERACTABLE");
@@ -68,7 +82,10 @@ export class RecoveryPolicyGate {
       return {
         decision: "REJECTED",
         reasonCodes,
-        explanation: `Candidate '${candidate.name}' flagged by Semantic Vector Engine as a destructive/canceling action. Strictly prohibited during recovery.`
+        explanation: `Candidate '${candidate.name}' flagged by Semantic Vector Engine as a destructive/canceling action. Strictly prohibited during recovery.`,
+        similarityScore,
+        minimumSimilarity,
+        humanApproved
       };
     }
     reasonCodes.push("NON_DESTRUCTIVE_VERIFIED");
@@ -79,7 +96,10 @@ export class RecoveryPolicyGate {
       return {
         decision: "REVIEW_REQUIRED",
         reasonCodes,
-        explanation: `Candidate '${candidate.name}' is ambiguous (multiple identical controls exist). Stop safely for human review.`
+        explanation: `Candidate '${candidate.name}' is ambiguous (multiple identical controls exist). Stop safely for human review.`,
+        similarityScore,
+        minimumSimilarity,
+        humanApproved
       };
     }
     reasonCodes.push("UNIQUE_TARGET");
@@ -91,10 +111,28 @@ export class RecoveryPolicyGate {
       return {
         decision: "REJECTED",
         reasonCodes,
-        explanation: `Proposed action type '${actionType}' differs from contract action type '${step.actionType}'.`
+        explanation: `Proposed action type '${actionType}' differs from contract action type '${step.actionType}'.`,
+        similarityScore,
+        minimumSimilarity,
+        humanApproved
       };
     }
     reasonCodes.push("ACTION_TYPE_COMPATIBLE");
+
+    if (!humanApproved && similarityScore < minimumSimilarity) {
+      reasonCodes.push("SIMILARITY_BELOW_THRESHOLD");
+      return {
+        decision: "REVIEW_REQUIRED",
+        reasonCodes,
+        explanation: `Candidate '${candidate.name || candidate.candidateId}' scored ${similarityScore.toFixed(4)}, below the configured auto-acceptance threshold (${minimumSimilarity.toFixed(2)}). Human review is required before a retry.`,
+        similarityScore,
+        minimumSimilarity,
+        humanApproved: false
+      };
+    }
+    if (humanApproved) {
+      reasonCodes.push("HUMAN_APPROVED_CANDIDATE");
+    }
 
     // Rule 7: Risk policy gate
     if (step.riskCategory === "high") {
@@ -108,7 +146,10 @@ export class RecoveryPolicyGate {
       decision: "APPROVED",
       reasonCodes,
       explanation: `Candidate '${candidate.candidateId}' (${candidate.name}) approved by deterministic policy gate.`,
-      validatedCandidate: candidate
+      validatedCandidate: candidate,
+      similarityScore,
+      minimumSimilarity,
+      humanApproved
     };
   }
 }

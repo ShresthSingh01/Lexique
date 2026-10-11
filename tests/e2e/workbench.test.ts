@@ -39,9 +39,26 @@ describe("Ojastra 100% Real Verification Suite", () => {
     expect(run.run.status).toBe("PASSED");
     expect(run.steps.length).toBe(5);
     expect(run.run.recovery_count).toBe(0);
+    for (const step of run.steps) {
+      expect(run.artifacts).toContainEqual(expect.objectContaining({
+        step_id: step.step_id,
+        attempt_number: step.attempt_number,
+        artifact_type: "screenshot"
+      }));
+      expect(run.artifacts).toContainEqual(expect.objectContaining({
+        step_id: step.step_id,
+        attempt_number: step.attempt_number,
+        artifact_type: "dom_snapshot"
+      }));
+    }
+
+    const screenshot = run.artifacts.find((artifact: any) => artifact.artifact_type === "screenshot");
+    const screenshotRes = await fetch(`${API_BASE}/runs/${runId}/artifacts/${screenshot.id}`);
+    expect(screenshotRes.status).toBe(200);
+    expect(screenshotRes.headers.get("content-type")).toBe("image/png");
   }, 35000);
 
-  it("2. M01_RENAME_TARGET detects drift and heals via Stagehand/policy/replay (HEALED)", async () => {
+  it("2. M01_RENAME_TARGET pauses below threshold and heals only after reviewed retry", async () => {
     await fetch(`${DEMO_BASE}/fixtures/reset`, { method: "POST" });
 
     const createRes = await fetch(`${API_BASE}/runs`, {
@@ -68,11 +85,44 @@ describe("Ojastra 100% Real Verification Suite", () => {
     }
 
     expect(run).not.toBeNull();
-    expect(run.run.status).toBe("HEALED");
-    expect(run.run.recovery_count).toBe(1);
+    expect(run.run.status).toBe("REVIEW_REQUIRED");
     expect(run.recoveryAttempts.length).toBeGreaterThan(0);
-    expect(run.recoveryAttempts[0].policy_decision).toBe("APPROVED");
+    expect(run.recoveryAttempts[0].policy_decision).toBe("REVIEW_REQUIRED");
+    const policyDecision = run.events.find((event: any) => event.type === "RECOVERY_POLICY_DECIDED");
+    expect(policyDecision.payload).toEqual(expect.objectContaining({
+      minimumSimilarity: 0.85,
+      humanApproved: false
+    }));
+    expect(policyDecision.payload.similarityScore).toBeLessThan(0.85);
     expect(run.artifacts.length).toBeGreaterThanOrEqual(2);
+
+    const selectedCandidate = run.recoveryAttempts[0].candidateSet.find((candidate: any) =>
+      candidate.name === "Place order" && candidate.isVisible && candidate.isEnabled && candidate.isUnique
+    );
+    expect(selectedCandidate).toBeDefined();
+    const approval = await fetch(`${API_BASE}/runs/${runId}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: "approve_retry", candidateId: selectedCandidate.candidateId })
+    }).then(r => r.json());
+    expect(approval.childRunId).toBeTruthy();
+    expect(approval.message).toContain("fresh candidate");
+
+    let retry: any = null;
+    for (let i = 0; i < 25; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      const res = await fetch(`${API_BASE}/runs/${approval.childRunId}`).then(r => r.json());
+      if (["PASSED", "HEALED", "FAILED", "REVIEW_REQUIRED"].includes(res.run.status)) {
+        retry = res;
+        break;
+      }
+    }
+    expect(retry).not.toBeNull();
+    expect(retry.run.parent_run_id).toBe(runId);
+    expect(retry.run.status).toBe("HEALED");
+    expect(retry.run.recovery_count).toBe(1);
+    expect(retry.recoveryAttempts[0].policy_decision).toBe("APPROVED");
+    expect(retry.events.find((event: any) => event.type === "RECOVERY_POLICY_DECIDED").payload.humanApproved).toBe(true);
   }, 35000);
 
   it("3. M06_WRONG_TOTAL refuses to heal real business bug (FAILED)", async () => {
@@ -105,6 +155,16 @@ describe("Ojastra 100% Real Verification Suite", () => {
     expect(run.run.status).toBe("FAILED");
     expect(run.run.error_code).toBe("VERIFIER_CONDITION_FAILED");
     expect(run.run.recovery_count).toBe(0); // Zero false heals!
+
+    const failedCheck = run.events.find((event: any) => event.type === "VERIFICATION_CHECK_FAILED");
+    expect(failedCheck).toBeDefined();
+    expect(failedCheck.sequenceNo).toBeGreaterThan(0);
+    expect(failedCheck.payload).toEqual(expect.objectContaining({
+      checkId: "cond-order-total",
+      expected: 54,
+      actual: 64
+    }));
+    expect(run.run.final_summary).toContain("1 of 5 success conditions failed");
   }, 35000);
 
   it("4. M05_DUPLICATE_LABEL stops safely on ambiguity (REVIEW_REQUIRED)", async () => {
@@ -136,6 +196,26 @@ describe("Ojastra 100% Real Verification Suite", () => {
     expect(run).not.toBeNull();
     expect(run.run.status).toBe("REVIEW_REQUIRED");
     expect(run.run.recovery_count).toBe(0);
+
+    const duplicateCandidate = run.recoveryAttempts[0].candidateSet[0];
+    const unsafeApproval = await fetch(`${API_BASE}/runs/${runId}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: "approve_retry", candidateId: `${duplicateCandidate.candidateId}_not_observed` })
+    });
+    expect(unsafeApproval.status).toBe(400);
+
+    const clarification = await fetch(`${API_BASE}/runs/${runId}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: "clarification", note: "Please confirm whether the express or standard order action is intended." })
+    });
+    expect(clarification.status).toBe(201);
+    const reviewedRun = await fetch(`${API_BASE}/runs/${runId}`).then(r => r.json());
+    expect(reviewedRun.humanReviews).toContainEqual(expect.objectContaining({
+      decision: "CLARIFICATION",
+      note: "Please confirm whether the express or standard order action is intended."
+    }));
   }, 35000);
 
   it("5. Contract Studio API: create custom test, ping URL, and commit heal", async () => {
