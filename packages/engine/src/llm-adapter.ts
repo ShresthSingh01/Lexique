@@ -51,73 +51,100 @@ ${JSON.stringify(candidateSummary, null, 2)}
 
 Select the candidate that safely fulfills this step intent, or return NO_SAFE_MATCH.`;
 
-    // 1. Determine active cloud LLM provider based on CONFIG.llmProvider
-    let apiKey = "";
-    let baseUrl = "";
-    let model = "";
-
+    // 1. Google Gemini native REST endpoint with structured JSON
     const provider = (CONFIG.llmProvider || "").toLowerCase();
     if ((provider === "gemini" || !provider) && CONFIG.geminiApiKey) {
-      apiKey = CONFIG.geminiApiKey;
-      baseUrl = CONFIG.geminiBaseUrl;
-      model = CONFIG.geminiModel;
-    } else if (provider === "mistral" && CONFIG.mistralApiKey) {
-      apiKey = CONFIG.mistralApiKey;
-      baseUrl = CONFIG.mistralBaseUrl;
-      model = CONFIG.llmModel;
-    } else if (provider === "openai" && CONFIG.openaiApiKey) {
-      apiKey = CONFIG.openaiApiKey;
-      baseUrl = CONFIG.openaiBaseUrl;
-      model = CONFIG.llmModel;
-    } else if (CONFIG.geminiApiKey) {
-      apiKey = CONFIG.geminiApiKey;
-      baseUrl = CONFIG.geminiBaseUrl;
-      model = CONFIG.geminiModel;
-    } else if (CONFIG.mistralApiKey) {
-      apiKey = CONFIG.mistralApiKey;
-      baseUrl = CONFIG.mistralBaseUrl;
-      model = CONFIG.llmModel;
-    }
-
-    if (apiKey) {
       try {
-        const response = await fetch(`${baseUrl}/chat/completions`, {
+        const url = `${CONFIG.geminiApiUrl}/models/${CONFIG.geminiModel}:generateContent?key=${CONFIG.geminiApiKey}`;
+        const response = await fetch(url, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt }
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.1,
-            max_tokens: 500
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ parts: [{ text: userPrompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: "application/json"
+            }
           }),
           signal: AbortSignal.timeout(CONFIG.llmTimeoutMs)
         });
 
         if (response.ok) {
           const data: any = await response.json();
-          const content = data.choices?.[0]?.message?.content;
+          const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (content) {
             const parsed = JSON.parse(content);
             const validated = RecoveryProposalSchema.parse(parsed);
             return {
               proposal: validated,
-              modelName: model,
+              modelName: CONFIG.geminiModel,
               latencyMs: Date.now() - startTime
             };
           }
         } else {
           const errText = await response.text();
-          console.warn(`[LlmAdapter] Provider HTTP error ${response.status}: ${errText}. Cascading to Vector Space Engine.`);
+          console.warn(`[LlmAdapter] Gemini API HTTP ${response.status}: ${errText}. Cascading to Vector Space Engine.`);
         }
       } catch (err: any) {
-        console.warn(`[LlmAdapter] Cloud LLM error (${err.message}). Cascading to Vector Space Engine.`);
+        console.warn(`[LlmAdapter] Gemini error (${err.message}). Cascading to Vector Space Engine.`);
+      }
+    } else {
+      // Mistral / OpenAI compatible endpoint
+      let apiKey = "";
+      let baseUrl = "";
+      let model = "";
+
+      if (provider === "mistral" && CONFIG.mistralApiKey) {
+        apiKey = CONFIG.mistralApiKey;
+        baseUrl = CONFIG.mistralBaseUrl;
+        model = CONFIG.llmModel;
+      } else if (provider === "openai" && CONFIG.openaiApiKey) {
+        apiKey = CONFIG.openaiApiKey;
+        baseUrl = CONFIG.openaiBaseUrl;
+        model = CONFIG.llmModel;
+      }
+
+      if (apiKey) {
+        try {
+          const response = await fetch(`${baseUrl}/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+              ],
+              response_format: { type: "json_object" },
+              temperature: 0.1,
+              max_tokens: 500
+            }),
+            signal: AbortSignal.timeout(CONFIG.llmTimeoutMs)
+          });
+
+          if (response.ok) {
+            const data: any = await response.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (content) {
+              const parsed = JSON.parse(content);
+              const validated = RecoveryProposalSchema.parse(parsed);
+              return {
+                proposal: validated,
+                modelName: model,
+                latencyMs: Date.now() - startTime
+              };
+            }
+          } else {
+            const errText = await response.text();
+            console.warn(`[LlmAdapter] Provider HTTP error ${response.status}: ${errText}. Cascading to Vector Space Engine.`);
+          }
+        } catch (err: any) {
+          console.warn(`[LlmAdapter] Cloud LLM error (${err.message}). Cascading to Vector Space Engine.`);
+        }
       }
     }
 

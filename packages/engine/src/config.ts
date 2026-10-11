@@ -21,14 +21,15 @@ export const CONFIG = {
   // LLM Configuration
   llmProvider: process.env.LLM_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : (process.env.MISTRAL_API_KEY ? "mistral" : "openai")),
   geminiApiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "",
+  geminiApiUrl: process.env.GEMINI_API_URL || "https://generativelanguage.googleapis.com/v1beta",
   geminiBaseUrl: process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai",
-  geminiModel: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+  geminiModel: process.env.GEMINI_MODEL || "gemini-3.8-flash",
   mistralApiKey: process.env.MISTRAL_API_KEY || "",
   mistralBaseUrl: process.env.MISTRAL_BASE_URL || "https://api.mistral.ai/v1",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openaiBaseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
-  llmModel: process.env.LLM_MODEL || (process.env.GEMINI_API_KEY ? "gemini-1.5-flash" : "mistral-small-latest"),
-  llmTimeoutMs: parseInt(process.env.LLM_TIMEOUT_MS || "20000", 10),
+  llmModel: process.env.LLM_MODEL || (process.env.GEMINI_API_KEY ? "gemini-3.8-flash" : "mistral-small-latest"),
+  llmTimeoutMs: parseInt(process.env.LLM_TIMEOUT_MS || "45000", 10),
   maxRecoveryAttemptsPerStep: 1
 };
 
