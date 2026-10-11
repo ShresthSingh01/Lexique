@@ -10,6 +10,7 @@ if (!fs.existsSync(dbDir)) {
 }
 
 export const db = new DatabaseSync(CONFIG.databasePath);
+db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
 
 // Initialize tables
 db.exec(`

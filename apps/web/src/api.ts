@@ -27,16 +27,67 @@ export async function fetchRunDetail(runId: string): Promise<RunDetail> {
   return res.json();
 }
 
-export async function createRun(testId: string, mutationScenarioId?: string | null): Promise<{ runId: string }> {
+export async function createRun(testId: string, mutationScenarioId?: string | null, contractVersion?: number): Promise<{ runId: string }> {
+  let version = contractVersion;
+  if (!version) {
+    try {
+      const testDetail = await fetchTestDetail(testId);
+      version = testDetail.active_contract_version || 1;
+    } catch {
+      version = 1;
+    }
+  }
+
   const res = await fetch(`${BASE}/runs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       testId,
-      contractVersion: 1,
+      contractVersion: version,
       mutationScenarioId: mutationScenarioId || null,
       idempotencyKey: `client_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
     })
+  });
+  return res.json();
+}
+
+export async function createTest(payload: any): Promise<{ testId: string; contractVersion: number }> {
+  const res = await fetch(`${BASE}/tests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export async function updateContract(testId: string, payload: any): Promise<any> {
+  const res = await fetch(`${BASE}/tests/${testId}/contract`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export async function pingUrl(url: string): Promise<{ reachable: boolean; statusCode: number; latencyMs: number; error?: string }> {
+  const res = await fetch(`${BASE}/ping-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url })
+  });
+  return res.json();
+}
+
+export async function pingTest(testId: string): Promise<{ reachable: boolean; statusCode: number; latencyMs: number; error?: string; baseUrl?: string }> {
+  const res = await fetch(`${BASE}/tests/${testId}/ping`);
+  return res.json();
+}
+
+export async function commitHeal(testId: string, stepId: string, newLocator: string, runId?: string): Promise<any> {
+  const res = await fetch(`${BASE}/tests/${testId}/commit-heal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stepId, newLocator, runId })
   });
   return res.json();
 }
@@ -56,15 +107,33 @@ export async function fetchBenchmark(): Promise<BenchmarkMetrics> {
   return res.json();
 }
 
+export async function clearAllRuns(): Promise<void> {
+  await fetch(`${BASE}/runs/clear`, { method: "POST" });
+}
+
 export function subscribeToEvents(runId: string, onEvent: (event: any) => void): () => void {
   const es = new EventSource(`${BASE}/runs/${runId}/events`);
-  es.onmessage = (e) => {
+  const handler = (e: MessageEvent) => {
     try {
       const data = JSON.parse(e.data);
       onEvent(data);
     } catch {}
   };
+  es.onmessage = handler;
+  const eventTypes = [
+    "RUN_STARTED", "STEP_PASSED", "STEP_FAILED", "EVIDENCE_CAPTURED",
+    "FAILURE_CLASSIFIED", "RECOVERY_STARTED", "RECOVERY_CANDIDATES_FOUND",
+    "RECOVERY_PROPOSED", "RECOVERY_POLICY_DECIDED", "REPLAY_STARTED",
+    "VERIFICATION_STARTED", "VERIFICATION_CHECK_PASSED", "VERIFICATION_CHECK_FAILED",
+    "RUN_FINISHED", "RUN_FAILED", "REVIEW_REQUIRED"
+  ];
+  for (const t of eventTypes) {
+    es.addEventListener(t, handler as any);
+  }
   return () => {
+    for (const t of eventTypes) {
+      es.removeEventListener(t, handler as any);
+    }
     es.close();
   };
 }

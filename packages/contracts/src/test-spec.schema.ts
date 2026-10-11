@@ -42,6 +42,7 @@ export const SuccessConditionSchema = z.object({
   type: z.enum([
     "ui_element_visible",
     "ui_text_equals",
+    "ui_url_contains",
     "backend_order_state",
     "sku_quantity_match",
     "order_total_match",

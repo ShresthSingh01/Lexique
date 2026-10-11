@@ -1,20 +1,57 @@
 import React, { useState } from "react";
 import { RunDetail } from "../types.js";
 import { StatusBadge } from "../components/StatusBadge.js";
+import { commitHeal } from "../api.js";
+import {
+  ShieldCheck,
+  CheckCircle2,
+  AlertOctagon,
+  RefreshCw,
+  ExternalLink,
+  Database,
+  ArrowRight,
+  FileCode2,
+  Terminal,
+  Activity,
+  Layers
+} from "lucide-react";
 
 interface Props {
   runDetail: RunDetail | null;
   onRefresh: () => void;
+  onRunBaseline?: () => void;
+  isRunning?: boolean;
 }
 
-export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
+export const RunExplorerView: React.FC<Props> = ({
+  runDetail,
+  onRefresh,
+  onRunBaseline,
+  isRunning = false
+}) => {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"diagnostics" | "recovery" | "verifier" | "events">("diagnostics");
+  const [committing, setCommitting] = useState(false);
+  const [commitStatus, setCommitStatus] = useState<string | null>(null);
 
   if (!runDetail) {
     return (
-      <div style={{ padding: 60, textAlign: "center", color: "var(--text-tertiary)" }}>
-        Select a run from the Overview or Mutation Lab to inspect step evidence and recovery audit trails.
+      <div style={{ maxWidth: 900, margin: "60px auto", padding: "40px 24px", textAlign: "center" }}>
+        <div className="icon-pod icon-pod-indigo" style={{ width: 48, height: 48, margin: "0 auto 16px auto" }}>
+          <Activity size={24} color="#4f46e5" />
+        </div>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)", marginBottom: 8 }}>
+          No Active Test Run Selected
+        </h2>
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 520, margin: "0 auto 24px auto", lineHeight: 1.6 }}>
+          Select a test execution from the Overview table, or launch a live baseline run to inspect actual Playwright viewport screenshots, Stagehand candidate sets, and database verification receipts.
+        </p>
+        {onRunBaseline && (
+          <button className="btn btn-primary" onClick={onRunBaseline} disabled={isRunning} style={{ padding: "10px 22px" }}>
+            <RefreshCw size={14} className={isRunning ? "pulsing-dot" : ""} />
+            <span>{isRunning ? "Executing Playwright..." : "Run Baseline Suite"}</span>
+          </button>
+        )}
       </div>
     );
   }
@@ -33,29 +70,50 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
   // Recovery attempt for this step
   const recoveryAttempt = recoveryAttempts.find(r => r.step_id === activeStep?.step_id) || recoveryAttempts[0];
 
-  // Failure event
+  // Find chosen candidate and healed selector
+  const chosenCandidate = recoveryAttempt?.candidateSet?.find(
+    (c: any) => c.candidateId === recoveryAttempt?.proposal?.targetCandidateId
+  );
+  const healedSelector = chosenCandidate?.selector || recoveryAttempt?.proposal?.targetCandidateId;
+
+  const handleCommitHeal = async () => {
+    if (!recoveryAttempt?.step_id || !healedSelector) return;
+    setCommitting(true);
+    try {
+      const res = await commitHeal(run.test_id, recoveryAttempt.step_id, healedSelector, run.id);
+      setCommitStatus(`Contract successfully updated to v${res.newContractVersion} with healed locator '${healedSelector}'!`);
+      onRefresh();
+    } catch (err: any) {
+      setCommitStatus(`Failed to commit healed locator: ${err.message}`);
+    } finally {
+      setCommitting(false);
+    }
+  };
+
+  // Failure and verifier events
   const failureEvent = events.find(e => e.type === "FAILURE_CLASSIFIED");
   const verifierEvents = events.filter(e => e.type === "VERIFICATION_CHECK_PASSED" || e.type === "VERIFICATION_CHECK_FAILED");
 
   return (
     <div style={{ height: "calc(100vh - 65px)", display: "flex", flexDirection: "column" }}>
-      {/* Run Top Summary Bar */}
+      {/* Top Run Header Bar */}
       <div style={{
-        background: "var(--bg-surface)",
-        borderBottom: "1px solid var(--border-subtle)",
-        padding: "12px 24px",
+        background: "#ffffff",
+        borderBottom: "1px solid var(--border-light)",
+        padding: "14px 28px",
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "center"
+        alignItems: "center",
+        boxShadow: "var(--shadow-sm)"
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <StatusBadge status={run.status} />
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
-              Run ID: <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-cyan)" }}>{run.id}</span>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>
+              Run ID: <span style={{ fontFamily: "var(--font-mono)", color: "#4f46e5" }}>{run.id}</span>
             </div>
             <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-              {run.mutation_scenario_id ? `Mutation: ${run.mutation_scenario_id}` : "Baseline Test (Version A)"} | Started {new Date(run.started_at).toLocaleTimeString()}
+              {run.mutation_scenario_id ? `Mutation Scenario: ${run.mutation_scenario_id}` : "Baseline Test (Canonical Contract)"} • Started {new Date(run.started_at).toLocaleTimeString()}
             </div>
           </div>
         </div>
@@ -63,34 +121,44 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {run.final_summary && (
             <div style={{
-              background: "rgba(15, 23, 42, 0.8)",
-              border: "1px solid var(--border-medium)",
-              padding: "6px 14px",
+              background: "#f8fafc",
+              border: "1px solid var(--border-light)",
+              padding: "5px 12px",
               borderRadius: 6,
               fontSize: 12,
-              color: run.status === "HEALED" ? "var(--accent-cyan)" : (run.status === "PASSED" ? "var(--accent-green)" : "var(--accent-rose)")
+              fontWeight: 600,
+              color: run.status === "HEALED" ? "#059669" : (run.status === "PASSED" ? "#2563eb" : "#e11d48")
             }}>
               {run.final_summary}
             </div>
           )}
 
-          <button className="btn btn-secondary" style={{ padding: "6px 12px", fontSize: 12 }} onClick={onRefresh}>
-            Refresh
+          <button className="btn btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }} onClick={onRefresh}>
+            <RefreshCw size={13} color="#4f46e5" />
+            <span>Refresh Telemetry</span>
           </button>
         </div>
       </div>
 
-      {/* 3-Pane Body */}
-      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "300px 1fr 420px", overflow: "hidden" }}>
-        {/* Pane 1: Left Step Timeline */}
+      {/* 3-Pane Evidence Body */}
+      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "310px 1fr 430px", overflow: "hidden" }}>
+        {/* Pane 1: Left Step Execution Timeline */}
         <div style={{
-          background: "var(--bg-app)",
-          borderRight: "1px solid var(--border-subtle)",
+          background: "#ffffff",
+          borderRight: "1px solid var(--border-light)",
           overflowY: "auto",
           padding: 16
         }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 12, letterSpacing: "0.05em" }}>
-            Execution Step Timeline ({steps.length})
+          <div style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: "#4f46e5",
+            textTransform: "uppercase",
+            marginBottom: 12,
+            letterSpacing: "0.05em",
+            fontFamily: "var(--font-mono)"
+          }}>
+            Execution Steps ({steps.length})
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -101,31 +169,32 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
                   key={step.id}
                   onClick={() => setSelectedStepId(step.step_id)}
                   style={{
-                    background: isSelected ? "var(--bg-card)" : "rgba(15, 23, 42, 0.4)",
-                    border: `1px solid ${isSelected ? "var(--border-active)" : "var(--border-subtle)"}`,
+                    background: isSelected ? "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)" : "#f8fafc",
+                    border: isSelected ? "1px solid #c7d2fe" : "1px solid var(--border-light)",
                     borderRadius: 8,
                     padding: "10px 12px",
                     cursor: "pointer",
-                    transition: "all 0.15s ease"
+                    transition: "all 0.12s ease",
+                    boxShadow: isSelected ? "0 2px 6px rgba(79, 70, 229, 0.1)" : "none"
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                      STEP {idx + 1} (ATTEMPT {step.attempt_number})
+                    <span style={{ fontSize: 11, color: isSelected ? "#4f46e5" : "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                      STEP {idx + 1}
                     </span>
-                    <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                    <span style={{ fontSize: 11, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
                       {step.duration_ms}ms
                     </span>
                   </div>
 
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>
                     {step.step_name}
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <StatusBadge status={step.status} />
                     {step.status === "HEALED" && (
-                      <span style={{ fontSize: 10, color: "var(--accent-cyan)", fontWeight: 700, fontFamily: "var(--font-mono)" }}>
+                      <span style={{ fontSize: 10, color: "#059669", fontWeight: 800, fontFamily: "var(--font-mono)" }}>
                         ✨ REPLAY HEALED
                       </span>
                     )}
@@ -136,22 +205,105 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
           </div>
         </div>
 
-        {/* Pane 2: Center Evidence Viewer */}
+        {/* Pane 2: Center Evidence & Screenshot Viewer */}
         <div style={{
-          background: "var(--bg-surface)",
-          borderRight: "1px solid var(--border-subtle)",
+          background: "var(--bg-app)",
+          borderRight: "1px solid var(--border-light)",
           overflowY: "auto",
-          padding: 20,
+          padding: 22,
           display: "flex",
           flexDirection: "column"
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          {/* Autonomous Healed Banner */}
+          {(run.status === "HEALED" || activeStep?.status === "HEALED") && healedSelector && (
+            <div style={{
+              background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
+              border: "1px solid #6ee7b7",
+              borderRadius: 10,
+              padding: "16px 20px",
+              marginBottom: 20,
+              boxShadow: "0 2px 8px rgba(16, 185, 129, 0.15)"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{
+                    background: "#059669",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono)",
+                    padding: "3px 8px",
+                    borderRadius: 4,
+                    letterSpacing: "0.04em"
+                  }}>
+                    ✨ AUTONOMOUS RECOVERY
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#065f46" }}>
+                    Healed Selector Discovered & Validated
+                  </span>
+                </div>
+
+                {!commitStatus && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleCommitHeal}
+                    disabled={committing}
+                    style={{ padding: "6px 14px", fontSize: 12, fontWeight: 700 }}
+                  >
+                    {committing ? "Updating Contract..." : `Commit to Contract v${run.contract_version + 1} ↗`}
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 12, marginBottom: commitStatus ? 10 : 0 }}>
+                <div style={{ background: "#ffffff", padding: "10px 12px", borderRadius: 6, border: "1px solid #a7f3d0" }}>
+                  <span style={{ color: "#065f46", textTransform: "uppercase", fontSize: 10, display: "block", marginBottom: 4, fontWeight: 700 }}>
+                    Original Target (Drifted):
+                  </span>
+                  <span style={{ fontFamily: "var(--font-mono)", color: "#e11d48", fontWeight: 700, wordBreak: "break-all" }}>
+                    {activeStep?.step_name || "Target Step"}
+                  </span>
+                </div>
+                <div style={{ background: "#ffffff", padding: "10px 12px", borderRadius: 6, border: "1px solid #a7f3d0" }}>
+                  <span style={{ color: "#065f46", textTransform: "uppercase", fontSize: 10, display: "block", marginBottom: 4, fontWeight: 700 }}>
+                    Healed Locator (Passed Clean Replay):
+                  </span>
+                  <span style={{ fontFamily: "var(--font-mono)", color: "#059669", fontWeight: 800, wordBreak: "break-all" }}>
+                    {healedSelector}
+                  </span>
+                </div>
+              </div>
+
+              {commitStatus && (
+                <div style={{
+                  marginTop: 10,
+                  padding: "10px 14px",
+                  background: "#ffffff",
+                  border: "1px solid #059669",
+                  borderRadius: 6,
+                  color: "#059669",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8
+                }}>
+                  <CheckCircle2 size={16} />
+                  <span>{commitStatus}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Screenshot Evidence Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
-                Browser Evidence Capture
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)" }}>
+                Playwright Viewport Evidence Capture
               </h3>
-              <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                Actual Playwright Chromium viewport recorded during failure / verification milestone.
+              <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+                Real browser viewport screenshot captured during Playwright execution milestone.
               </p>
             </div>
 
@@ -161,25 +313,21 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
                 target="_blank"
                 rel="noreferrer"
                 className="btn btn-secondary"
-                style={{ fontSize: 11, padding: "4px 10px" }}
+                style={{ fontSize: 11, padding: "5px 12px" }}
               >
-                Open Fullscreen PNG ↗
+                <ExternalLink size={12} color="#4f46e5" />
+                <span>Open Fullscreen PNG</span>
               </a>
             )}
           </div>
 
+          {/* Actual Viewport Image */}
           {screenshotArtifact ? (
-            <div style={{
-              background: "#000",
-              border: "1px solid var(--border-medium)",
-              borderRadius: 8,
-              overflow: "hidden",
-              marginBottom: 20,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.5)"
-            }}>
+            <div className="card-clean" style={{ overflow: "hidden", marginBottom: 20 }}>
               <div style={{
-                background: "#1e293b",
-                padding: "6px 12px",
+                background: "#f8fafc",
+                borderBottom: "1px solid var(--border-light)",
+                padding: "8px 14px",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
@@ -190,33 +338,33 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }}></span>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }}></span>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }}></span>
-                <span style={{ marginLeft: 8 }}>http://localhost:3001/cart</span>
+                <span style={{ marginLeft: 6, color: "#4f46e5", fontWeight: 600 }}>http://localhost:3001/checkout</span>
               </div>
               <img
                 src={`/api/runs/${run.id}/artifacts/${screenshotArtifact.id}`}
-                alt="Run screenshot"
+                alt="Playwright viewport capture"
                 style={{ width: "100%", height: "auto", display: "block" }}
               />
             </div>
           ) : (
-            <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)", marginBottom: 20 }}>
-              No visual screenshot captured for this step (test passed directly without failure trigger).
+            <div className="card-clean" style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", marginBottom: 20 }}>
+              No failure screenshot captured for this step (step passed clean without triggering evidence recorder).
             </div>
           )}
 
-          {/* Step Failure Error Box if failed */}
+          {/* Real Playwright Error Summary Box */}
           {activeStep?.error_summary && (
             <div style={{
-              background: "rgba(244, 63, 94, 0.08)",
-              border: "1px solid rgba(244, 63, 94, 0.3)",
+              background: "#fff1f2",
+              border: "1px solid #fecdd3",
               borderRadius: 8,
-              padding: 14,
+              padding: 16,
               marginBottom: 16
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent-rose)", marginBottom: 4 }}>
-                ORIGINAL STEP ERROR
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#e11d48", marginBottom: 6, letterSpacing: "0.05em", fontFamily: "var(--font-mono)" }}>
+                PLAYWRIGHT EXCEPTION STACK TRACE
               </div>
-              <pre style={{ fontSize: 11, color: "#fecdd3", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+              <pre style={{ fontSize: 11, color: "#be123c", whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "var(--font-mono)" }}>
                 {activeStep.error_summary}
               </pre>
             </div>
@@ -225,14 +373,14 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
 
         {/* Pane 3: Right Audit & Verification Panel */}
         <div style={{
-          background: "var(--bg-app)",
+          background: "#ffffff",
           overflowY: "auto",
           padding: 18,
           display: "flex",
           flexDirection: "column"
         }}>
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: 4, background: "var(--bg-surface)", padding: 4, borderRadius: 6, marginBottom: 16 }}>
+          {/* Segmented Audit Tabs */}
+          <div style={{ display: "flex", gap: 4, background: "#f1f5f9", padding: 3, borderRadius: 8, marginBottom: 16 }}>
             {[
               { id: "diagnostics", label: "Diagnostics" },
               { id: "recovery", label: "Recovery Audit" },
@@ -244,14 +392,16 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
                 onClick={() => setActiveTab(tab.id as any)}
                 style={{
                   flex: 1,
-                  background: activeTab === tab.id ? "var(--bg-card)" : "transparent",
-                  color: activeTab === tab.id ? "#fff" : "var(--text-secondary)",
+                  background: activeTab === tab.id ? "#ffffff" : "transparent",
+                  color: activeTab === tab.id ? "#4f46e5" : "var(--text-secondary)",
                   border: "none",
-                  borderRadius: 4,
+                  borderRadius: 6,
                   padding: "6px 8px",
                   fontSize: 11,
                   fontWeight: activeTab === tab.id ? 700 : 500,
-                  cursor: "pointer"
+                  cursor: "pointer",
+                  boxShadow: activeTab === tab.id ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
+                  transition: "all 0.12s ease"
                 }}
               >
                 {tab.label}
@@ -264,29 +414,29 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {failureEvent ? (
                 <>
-                  <div className="card">
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 4 }}>
-                      Rule-First Classification
+                  <div className="card-clean" style={{ padding: 14, borderLeft: "4px solid #4f46e5" }}>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 4, fontWeight: 700, letterSpacing: "0.05em" }}>
+                      Failure Classifier Category
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "var(--accent-cyan)", fontFamily: "var(--font-mono)", marginBottom: 6 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#4f46e5", fontFamily: "var(--font-mono)", marginBottom: 6 }}>
                       {failureEvent.payload.category}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                      Confidence: {Math.round((failureEvent.payload.confidence || 0) * 100)}% | Recoverable: {failureEvent.payload.isRecoverable ? "YES (UI Drift)" : "NO (Hard Bug)"}
+                      Confidence: {Math.round((failureEvent.payload.confidence || 0) * 100)}% • Recoverable: {failureEvent.payload.isRecoverable ? "YES (Benign Drift)" : "NO (True Regression)"}
                     </div>
                   </div>
 
-                  <div className="card">
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 6 }}>
+                  <div className="card-clean" style={{ padding: 14 }}>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 6, fontWeight: 700, letterSpacing: "0.05em" }}>
                       Classification Rationale
                     </div>
-                    <p style={{ fontSize: 13, color: "#fff", lineHeight: 1.5 }}>
+                    <p style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.5 }}>
                       {failureEvent.payload.reason}
                     </p>
                   </div>
 
-                  <div className="card">
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 6 }}>
+                  <div className="card-clean" style={{ padding: 14 }}>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 6, fontWeight: 700, letterSpacing: "0.05em" }}>
                       Evidence Signals
                     </div>
                     <ul style={{ paddingLeft: 18, fontSize: 12, color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: 4 }}>
@@ -297,8 +447,8 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
                   </div>
                 </>
               ) : (
-                <div className="card" style={{ textAlign: "center", color: "var(--text-tertiary)" }}>
-                  No failure classified. Test completed without triggering diagnostic handler.
+                <div className="card-clean" style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>
+                  No failure classified. Test executed cleanly without triggering diagnostic intervention.
                 </div>
               )}
             </div>
@@ -309,21 +459,23 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {recoveryAttempt ? (
                 <>
-                  <div className="card" style={{ borderLeft: "3px solid var(--accent-cyan)" }}>
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 4 }}>
+                  <div className="card-clean" style={{ padding: 14, borderLeft: "4px solid #059669" }}>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 4, fontWeight: 700, letterSpacing: "0.05em" }}>
                       Policy Gate Decision
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "var(--accent-cyan)", fontFamily: "var(--font-mono)", marginBottom: 6 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#059669", fontFamily: "var(--font-mono)", marginBottom: 8 }}>
                       {recoveryAttempt.policy_decision}
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                       {recoveryAttempt.reasonCodes.map((code: string, idx: number) => (
                         <span key={idx} style={{
-                          background: "#1e293b",
-                          color: "var(--accent-cyan)",
-                          padding: "2px 6px",
+                          background: "#ecfdf5",
+                          color: "#047857",
+                          border: "1px solid #a7f3d0",
+                          padding: "2px 7px",
                           borderRadius: 4,
                           fontSize: 10,
+                          fontWeight: 700,
                           fontFamily: "var(--font-mono)"
                         }}>
                           ✓ {code}
@@ -332,14 +484,14 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
                     </div>
                   </div>
 
-                  <div className="card">
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 4 }}>
+                  <div className="card-clean" style={{ padding: 14 }}>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 4, fontWeight: 700, letterSpacing: "0.05em" }}>
                       LLM Candidate Proposal
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
-                      Selected: <span style={{ color: "var(--accent-cyan)", fontFamily: "var(--font-mono)" }}>{recoveryAttempt.proposal.targetCandidateId || "NONE"}</span>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>
+                      Selected: <span style={{ color: "#4f46e5", fontFamily: "var(--font-mono)" }}>{recoveryAttempt.proposal.targetCandidateId || "NONE"}</span>
                     </div>
-                    <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>
+                    <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8, lineHeight: 1.5 }}>
                       {recoveryAttempt.proposal.rationale}
                     </p>
                     <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
@@ -347,14 +499,15 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
                     </div>
                   </div>
 
-                  <div className="card">
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 6 }}>
+                  <div className="card-clean" style={{ padding: 14 }}>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 6, fontWeight: 700, letterSpacing: "0.05em" }}>
                       Stagehand Observed Candidates ({recoveryAttempt.candidateSet.length})
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto" }}>
                       {recoveryAttempt.candidateSet.map((cand: any) => (
                         <div key={cand.candidateId} style={{
-                          background: "rgba(15, 23, 42, 0.6)",
+                          background: "#f8fafc",
+                          border: "1px solid var(--border-light)",
                           padding: "6px 8px",
                           borderRadius: 4,
                           fontSize: 11,
@@ -362,8 +515,8 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
                           justifyContent: "space-between",
                           fontFamily: "var(--font-mono)"
                         }}>
-                          <span style={{ color: "var(--accent-cyan)" }}>{cand.candidateId}: {cand.name || cand.role}</span>
-                          <span style={{ color: cand.isUnique ? "var(--accent-green)" : "var(--accent-rose)" }}>
+                          <span style={{ color: "#0f172a", fontWeight: 600 }}>{cand.candidateId}: {cand.name || cand.role}</span>
+                          <span style={{ color: cand.isUnique ? "#059669" : "#e11d48", fontWeight: 700 }}>
                             {cand.isUnique ? "UNIQUE" : "DUPLICATE"}
                           </span>
                         </div>
@@ -372,8 +525,8 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
                   </div>
                 </>
               ) : (
-                <div className="card" style={{ textAlign: "center", color: "var(--text-tertiary)" }}>
-                  No recovery attempt recorded for this step.
+                <div className="card-clean" style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>
+                  No recovery attempt needed for this step.
                 </div>
               )}
             </div>
@@ -382,36 +535,44 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
           {/* Tab 3: Oracle Verifier */}
           {activeTab === "verifier" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 2 }}>
                 Independent Backend Checks Evaluated:
               </div>
-              {verifierEvents.map((ev, idx) => {
-                const passed = ev.type === "VERIFICATION_CHECK_PASSED";
-                return (
-                  <div key={idx} style={{
-                    background: passed ? "rgba(16, 185, 129, 0.08)" : "rgba(244, 63, 94, 0.08)",
-                    border: `1px solid ${passed ? "rgba(16, 185, 129, 0.25)" : "rgba(244, 63, 94, 0.3)"}`,
-                    borderRadius: 6,
-                    padding: "10px 12px",
-                    fontSize: 12
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ fontWeight: 700, color: passed ? "#34d399" : "#fb7185" }}>
-                        {passed ? "✓ VERIFIED" : "✗ FAILED"}
-                      </span>
-                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)" }}>
-                        {ev.payload.checkId}
-                      </span>
-                    </div>
-                    <div style={{ color: "#fff", marginBottom: 2 }}>{ev.payload.description}</div>
-                    {ev.payload.actual !== undefined && (
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                        Expected: {JSON.stringify(ev.payload.expected)} | Actual: {JSON.stringify(ev.payload.actual)}
+              {verifierEvents.length === 0 ? (
+                <div className="card-clean" style={{ padding: 20, textAlign: "center", color: "var(--text-tertiary)" }}>
+                  Oracle verifier has not recorded assertions for this run yet.
+                </div>
+              ) : (
+                verifierEvents.map((ev, idx) => {
+                  const passed = ev.type === "VERIFICATION_CHECK_PASSED";
+                  return (
+                    <div key={idx} style={{
+                      background: passed ? "#f0fdf4" : "#fff1f2",
+                      border: `1px solid ${passed ? "#bbf7d0" : "#fecdd3"}`,
+                      borderRadius: 6,
+                      padding: "10px 12px",
+                      fontSize: 12
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 800, color: passed ? "#059669" : "#e11d48", fontFamily: "var(--font-mono)" }}>
+                          {passed ? "✓ VERIFIED" : "✗ FAILED"}
+                        </span>
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)" }}>
+                          {ev.payload.checkId}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      <div style={{ color: "var(--text-primary)", fontWeight: 600, marginBottom: 2 }}>
+                        {ev.payload.description}
+                      </div>
+                      {ev.payload.actual !== undefined && (
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+                          Expected: {JSON.stringify(ev.payload.expected)} | Actual: {JSON.stringify(ev.payload.actual)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
 
@@ -420,16 +581,16 @@ export const RunExplorerView: React.FC<Props> = ({ runDetail, onRefresh }) => {
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 600, overflowY: "auto" }}>
               {events.map((e) => (
                 <div key={e.id} style={{
-                  background: "rgba(15, 23, 42, 0.5)",
-                  border: "1px solid var(--border-subtle)",
+                  background: "#f8fafc",
+                  border: "1px solid var(--border-light)",
                   borderRadius: 4,
                   padding: "6px 8px",
                   fontSize: 11,
                   fontFamily: "var(--font-mono)"
                 }}>
-                  <div style={{ color: "var(--accent-cyan)", display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ color: "#4f46e5", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
                     <span>#{e.sequenceNo} {e.type}</span>
-                    <span style={{ color: "var(--text-tertiary)" }}>{new Date(e.timestamp).toLocaleTimeString()}</span>
+                    <span style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>{new Date(e.timestamp).toLocaleTimeString()}</span>
                   </div>
                   <pre style={{ color: "var(--text-secondary)", fontSize: 10, marginTop: 4, whiteSpace: "pre-wrap" }}>
                     {JSON.stringify(e.payload, null, 2)}

@@ -60,14 +60,41 @@ export class OutcomeVerifier {
           break;
         }
 
+        case "ui_url_contains": {
+          const currentUrl = page.url();
+          const expectedStr = typeof condition.expected === "string" ? condition.expected : String(condition.expected);
+          passed = currentUrl.includes(expectedStr);
+          actual = currentUrl;
+          break;
+        }
+
+        case "ui_text_equals": {
+          try {
+            const selector = typeof condition.expected === "object" && condition.expected?.selector ? condition.expected.selector : condition.expected;
+            const expectedText = typeof condition.expected === "object" && condition.expected?.text !== undefined ? condition.expected.text : "";
+            const el = await page.$(selector);
+            if (el) {
+              const text = (await el.innerText()).trim();
+              passed = text === String(expectedText).trim();
+              actual = text;
+            } else {
+              actual = "element_not_found";
+            }
+          } catch {
+            actual = "lookup_error";
+          }
+          break;
+        }
+
         case "sku_quantity_match": {
           if (backendOrder) {
-            const expectedSku = condition.expected.sku;
-            const expectedQty = condition.expected.quantity;
+            const expectedSku = condition.expected?.sku;
+            const expectedQty = condition.expected?.quantity;
             passed = backendOrder.sku === expectedSku && backendOrder.quantity === expectedQty;
             actual = { sku: backendOrder.sku, quantity: backendOrder.quantity };
           } else {
-            actual = "no_backend_order_record";
+            passed = false;
+            actual = uiOrderId ? "order_not_found_in_backend" : "no_order_id_found_on_page";
           }
           break;
         }
@@ -78,7 +105,8 @@ export class OutcomeVerifier {
             passed = Math.abs(backendOrder.total - expectedTotal) < 0.01;
             actual = backendOrder.total;
           } else {
-            actual = "no_backend_order_record";
+            passed = false;
+            actual = uiOrderId ? "order_not_found_in_backend" : "no_order_id_found_on_page";
           }
           break;
         }
@@ -88,7 +116,8 @@ export class OutcomeVerifier {
             passed = backendOrder.paymentStatus === condition.expected;
             actual = backendOrder.paymentStatus;
           } else {
-            actual = "no_backend_order_record";
+            passed = false;
+            actual = uiOrderId ? "order_not_found_in_backend" : "no_order_id_found_on_page";
           }
           break;
         }
@@ -98,13 +127,14 @@ export class OutcomeVerifier {
             const allOrdersRes = await fetch(`${CONFIG.demoOrigin}/api/orders`);
             if (allOrdersRes.ok) {
               const allOrdersData: any = await allOrdersRes.json();
-              // Exactly 1 order created for this run
               passed = allOrdersData.count === condition.expected;
               actual = allOrdersData.count;
             } else {
+              passed = false;
               actual = "failed_to_query_all_orders";
             }
           } catch {
+            passed = false;
             actual = "network_error_all_orders";
           }
           break;

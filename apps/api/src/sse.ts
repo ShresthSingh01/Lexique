@@ -58,7 +58,6 @@ export class SseManager {
   private static sendToClient(reply: FastifyReply, event: RunEvent): void {
     try {
       reply.raw.write(`id: ${event.sequenceNo}\n`);
-      reply.raw.write(`event: ${event.type}\n`);
       reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
     } catch {
       // client disconnected

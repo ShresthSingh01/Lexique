@@ -17,6 +17,7 @@ export const CONFIG = {
   demoOrigin: process.env.DEMO_APP_ORIGIN || `http://localhost:${process.env.DEMO_PORT || "3001"}`,
   storageDir: path.resolve(process.cwd(), process.env.STORAGE_DIR || "storage"),
   databasePath: path.resolve(process.cwd(), process.env.DATABASE_PATH || "storage/intentlock.db"),
+  headless: process.env.HEADLESS !== "false",
 
   // LLM Configuration
   llmProvider: process.env.LLM_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : (process.env.MISTRAL_API_KEY ? "mistral" : "openai")),

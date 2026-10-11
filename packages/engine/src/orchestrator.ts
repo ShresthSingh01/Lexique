@@ -38,6 +38,7 @@ export class RunOrchestrator {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   private recorder: EvidenceRecorder;
+  private startTime: number = Date.now();
 
   constructor(options: RunOptions) {
     this.runId = options.runId;
@@ -80,19 +81,21 @@ export class RunOrchestrator {
     this.currentStatus = status;
     const isTerminal = ["PASSED", "HEALED", "FAILED", "REVIEW_REQUIRED"].includes(status);
     const now = new Date().toISOString();
+    const durationMs = isTerminal ? Math.max(1, Date.now() - this.startTime) : null;
 
     db.prepare(`
       UPDATE test_runs
       SET status = ?,
           finished_at = CASE WHEN ? = 1 THEN ? ELSE finished_at END,
+          duration_ms = CASE WHEN ? = 1 THEN ? ELSE duration_ms END,
           final_summary = COALESCE(?, final_summary),
           error_code = COALESCE(?, error_code)
       WHERE id = ?
-    `).run(status, isTerminal ? 1 : 0, now, summary || null, errorCode || null, this.runId);
+    `).run(status, isTerminal ? 1 : 0, now, isTerminal ? 1 : 0, durationMs, summary || null, errorCode || null, this.runId);
   }
 
   public async execute(): Promise<RunStatus> {
-    const startTime = Date.now();
+    this.startTime = Date.now();
     this.emit("RUN_STARTED", {
       testId: this.contract.testId,
       contractVersion: this.contract.contractVersion,
@@ -107,7 +110,7 @@ export class RunOrchestrator {
 
       // 2. Launch Chromium browser
       this.browser = await chromium.launch({
-        headless: true,
+        headless: CONFIG.headless,
         args: ["--no-sandbox", "--disable-setuid-sandbox"]
       });
       this.context = await this.browser.newContext({
@@ -133,7 +136,7 @@ export class RunOrchestrator {
 
         if (outcome.allPassed) {
           this.updateStatus("PASSED", "Baseline test execution passed and all success conditions independently verified.");
-          this.emit("RUN_FINISHED", { status: "PASSED", summary: outcome.summary, durationMs: Date.now() - startTime });
+          this.emit("RUN_FINISHED", { status: "PASSED", summary: outcome.summary, durationMs: Date.now() - this.startTime });
           return "PASSED";
         } else {
           this.updateStatus("FAILED", outcome.summary, "VERIFIER_CONDITION_FAILED");
@@ -293,7 +296,7 @@ export class RunOrchestrator {
           recoveredStepId: failedStep.stepId,
           replacementCandidate: policyResult.validatedCandidate.name,
           summary: verifierOutcome.summary,
-          durationMs: Date.now() - startTime
+          durationMs: Date.now() - this.startTime
         });
         return "HEALED";
       } else {
@@ -318,15 +321,10 @@ export class RunOrchestrator {
 
   private async resetDemoState(clearMutation: boolean = true): Promise<void> {
     try {
+      // Unconditionally reset fixtures on every run so baseline and mutations start clean
       await fetch(`${CONFIG.demoOrigin}/api/fixtures/reset`, { method: "POST" });
-      if (this.mutationScenarioId && !clearMutation) {
-        await fetch(`${CONFIG.demoOrigin}/api/mutations/active`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scenarioId: this.mutationScenarioId })
-        });
-      } else if (this.mutationScenarioId && clearMutation) {
-        // Activate mutation for initial run
+      if (this.mutationScenarioId) {
+        // Activate requested mutation on demo server
         await fetch(`${CONFIG.demoOrigin}/api/mutations/active`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -385,6 +383,30 @@ export class RunOrchestrator {
           case "fill": {
             await page.waitForSelector(effectiveSelector, { timeout: step.timeoutMs, state: "visible" });
             await page.fill(effectiveSelector, step.inputValue || "", { timeout: step.timeoutMs });
+            break;
+          }
+
+          case "assert_visible": {
+            await page.waitForSelector(effectiveSelector, { timeout: step.timeoutMs, state: "visible" });
+            break;
+          }
+
+          case "assert_text": {
+            await page.waitForSelector(effectiveSelector, { timeout: step.timeoutMs, state: "visible" });
+            const text = (await page.innerText(effectiveSelector)).trim();
+            const expectedText = (step.inputValue || "").trim();
+            if (expectedText && !text.includes(expectedText)) {
+              throw new Error(`Text assertion failed: element text '${text}' does not contain '${expectedText}'`);
+            }
+            break;
+          }
+
+          case "assert_url": {
+            const currentUrl = page.url();
+            const expectedUrl = step.inputValue || step.targetLocator;
+            if (!currentUrl.includes(expectedUrl)) {
+              throw new Error(`URL assertion failed: current URL '${currentUrl}' does not contain '${expectedUrl}'`);
+            }
             break;
           }
 

@@ -1,30 +1,141 @@
 import React, { useState } from "react";
+import {
+  FlaskConical,
+  RotateCw,
+  Play,
+  ShieldAlert,
+  Sparkles,
+  Layers,
+  Database,
+  CheckCircle2,
+  AlertOctagon,
+  ArrowRight,
+  Filter
+} from "lucide-react";
 import { BenchmarkMetrics, MutationScenario } from "../types.js";
-import { StatusBadge } from "../components/StatusBadge.js";
 
 interface Props {
-  mutations: MutationScenario[];
-  benchmark: BenchmarkMetrics | null;
+  mutations?: MutationScenario[];
+  benchmark?: BenchmarkMetrics | null;
   onRunMutation: (scenarioId: string) => Promise<void>;
   onResetFixtures: () => Promise<void>;
-  onSelectRun: (runId: string) => void;
+  onSelectRun?: (runId: string) => void;
 }
 
 export const MutationLabView: React.FC<Props> = ({
-  mutations,
+  mutations = [],
   benchmark,
   onRunMutation,
-  onResetFixtures
+  onResetFixtures,
+  onSelectRun
 }) => {
-  const [runningScenarioId, setRunningScenarioId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<"all" | "ui" | "workflow" | "bugs">("all");
+  const [runningId, setRunningId] = useState<string | null>(null);
   const [resetting, setResetting] = useState<boolean>(false);
 
+  // Synchronized with packages/engine/src/seed.ts MUTATION_SCENARIOS
+  const scenarios = [
+    {
+      id: "M01_RENAME_TARGET",
+      name: "1. Rename Checkout Button Locator",
+      category: "ui" as const,
+      typeLabel: "UI Drift",
+      description: "Checkout button ID renamed from '#checkout-button' to '#place-order-action' and label to 'Place order' while preserving action semantics.",
+      expected: "HEALED",
+      expectedLabel: "Auto-Heals & Passes",
+      difficulty: "Semantic Role Match",
+      invariants: "Price $54.00 preserved"
+    },
+    {
+      id: "M02_RESTRUCTURE_DOM",
+      name: "2. Restructure DOM Hierarchy",
+      category: "ui" as const,
+      typeLabel: "UI Drift",
+      description: "Wraps checkout action in nested layout containers and custom CSS wrapper classes without changing page semantics.",
+      expected: "HEALED",
+      expectedLabel: "Auto-Heals & Passes",
+      difficulty: "Layout Tree Match",
+      invariants: "Price $54.00 preserved"
+    },
+    {
+      id: "M03_MOVE_TARGET",
+      name: "3. Relocate Checkout Button Section",
+      category: "ui" as const,
+      typeLabel: "UI Drift",
+      description: "Moves checkout action into an alternate 'Fast Order Routing' section below the cart summary table.",
+      expected: "HEALED",
+      expectedLabel: "Auto-Heals & Passes",
+      difficulty: "Spatial Viewport Match",
+      invariants: "Price $54.00 preserved"
+    },
+    {
+      id: "M04_ADD_REVIEW_STEP",
+      name: "4. Inject Intermediate Review Step",
+      category: "workflow" as const,
+      typeLabel: "Workflow Drift",
+      description: "Inserts a new intermediate review confirmation step between cart and checkout form that is not in the original contract.",
+      expected: "REVIEW_REQUIRED",
+      expectedLabel: "Policy Rejection / Review",
+      difficulty: "Step Expansion",
+      invariants: "Uncontracted transition"
+    },
+    {
+      id: "M05_DUPLICATE_LABEL",
+      name: "5. Ambiguous Duplicate Action Labels",
+      category: "workflow" as const,
+      typeLabel: "Ambiguity Drift",
+      description: "Renders two conflicting 'Place order' buttons on cart (Express vs Standard), causing locator ambiguity.",
+      expected: "REVIEW_REQUIRED",
+      expectedLabel: "Policy Rejection / Review",
+      difficulty: "Policy Uniqueness Gate",
+      invariants: "Prevents accidental branch"
+    },
+    {
+      id: "M06_WRONG_TOTAL",
+      name: "6. Seeded Price Inflation Regression",
+      category: "bugs" as const,
+      typeLabel: "Real Bug",
+      description: "Application bug charges $64.00 instead of $54.00 agreed in the contractual spec. Engine refuses to heal.",
+      expected: "FAILED",
+      expectedLabel: "Refuses Heal / Hard Fail",
+      difficulty: "Financial Invariant",
+      invariants: "Violated: +$10.00 Overcharge"
+    },
+    {
+      id: "M07_PAYMENT_ERROR",
+      name: "7. Mock Payment Gateway Failure",
+      category: "bugs" as const,
+      typeLabel: "Real Bug",
+      description: "Payment gateway returns declined. Engine must classify as assertion failure and refuse to heal.",
+      expected: "FAILED",
+      expectedLabel: "Refuses Heal / Hard Fail",
+      difficulty: "Gateway Invariant",
+      invariants: "Violated: Payment declined"
+    },
+    {
+      id: "M08_SERVER_UNAVAILABLE",
+      name: "8. Force 503 Service Unavailable",
+      category: "bugs" as const,
+      typeLabel: "Infrastructure Bug",
+      description: "Simulates backend service crash. Engine must classify as infrastructure/network error without attempting locator repair.",
+      expected: "FAILED",
+      expectedLabel: "Refuses Heal / Hard Fail",
+      difficulty: "Network Invariant",
+      invariants: "Violated: HTTP 503 returned"
+    }
+  ];
+
+  const filteredScenarios = scenarios.filter(s => {
+    if (activeCategory === "all") return true;
+    return s.category === activeCategory;
+  });
+
   const handleRun = async (id: string) => {
-    setRunningScenarioId(id);
+    setRunningId(id);
     try {
       await onRunMutation(id);
     } finally {
-      setRunningScenarioId(null);
+      setRunningId(null);
     }
   };
 
@@ -38,27 +149,52 @@ export const MutationLabView: React.FC<Props> = ({
   };
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px" }}>
-      {/* Top Banner */}
-      <div style={{
-        background: "linear-gradient(90deg, #131c31 0%, #0f172a 100%)",
-        border: "1px solid var(--border-medium)",
-        borderRadius: 10,
-        padding: "20px 24px",
-        marginBottom: 28,
+    <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 32px" }}>
+      {/* Header Banner (Linear Alabaster Luminous Card) */}
+      <div className="hero-card-alabaster" style={{
+        padding: "28px 32px",
+        marginBottom: 24,
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center"
       }}>
         <div>
-          <div style={{ fontSize: 12, color: "var(--accent-cyan)", fontWeight: 700, fontFamily: "var(--font-mono)", marginBottom: 4 }}>
-            DETERMINISTIC EVALUATION SUITE (P0 BENCHMARK)
+          <div style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)",
+            border: "1px solid #c7d2fe",
+            padding: "4px 12px",
+            borderRadius: 9999,
+            fontSize: 11,
+            fontWeight: 800,
+            color: "#4f46e5",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            marginBottom: 10,
+            boxShadow: "0 1px 3px rgba(79, 70, 229, 0.1)"
+          }}>
+            <FlaskConical size={14} color="#4f46e5" />
+            Deterministic Evaluation Suite • 8 Controlled Scenarios
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 6 }}>
+          <h1 style={{
+            fontSize: 24,
+            fontWeight: 800,
+            letterSpacing: "-0.02em",
+            marginBottom: 6,
+            color: "var(--text-primary)"
+          }}>
             Mutation Lab — Controlled Drift & Bug Injection
           </h1>
-          <p style={{ color: "var(--text-secondary)", fontSize: 13, maxWidth: 760 }}>
-            Trigger real UI mutations and seeded application regressions against the local demo. Observe IntentLock's real-time recovery on harmless locator drift, and its refusal to heal genuine defects.
+          <p style={{
+            fontSize: 13,
+            color: "var(--text-secondary)",
+            maxWidth: 760,
+            lineHeight: 1.6
+          }}>
+            Inject real DOM changes and application bugs into the local ShopMart store.
+            Watch IntentLock auto-heal benign UI drift in seconds, and strictly refuse to heal real business regressions.
           </p>
         </div>
 
@@ -66,171 +202,213 @@ export const MutationLabView: React.FC<Props> = ({
           className="btn btn-secondary"
           onClick={handleReset}
           disabled={resetting}
+          style={{
+            padding: "10px 18px",
+            fontSize: 12,
+            fontWeight: 600
+          }}
         >
-          {resetting ? "Resetting..." : "↺ Reset Store Fixtures"}
+          <RotateCw size={14} color="#4f46e5" className={resetting ? "pulsing-dot" : ""} />
+          <span>{resetting ? "Resetting Store Fixtures..." : "Reset Store Baseline (Version A)"}</span>
         </button>
       </div>
 
-      {/* 8 Scenario Cards Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 36 }}>
-        {mutations.map(m => {
-          const isRunning = runningScenarioId === m.id;
-          const stat = benchmark?.scenarios.find(s => s.scenarioId === m.id);
+      {/* Category Filter Pills Bar */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 24,
+        background: "#ffffff",
+        padding: "8px 12px",
+        borderRadius: 10,
+        border: "1px solid var(--border-light)",
+        boxShadow: "var(--shadow-sm)"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", fontSize: 12, fontWeight: 700, marginRight: 8 }}>
+          <Filter size={14} color="#4f46e5" />
+          <span>Filter Category:</span>
+        </div>
+
+        <button
+          onClick={() => setActiveCategory("all")}
+          style={{
+            background: activeCategory === "all" ? "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)" : "#f8fafc",
+            color: activeCategory === "all" ? "#ffffff" : "#475569",
+            border: activeCategory === "all" ? "1px solid #4338ca" : "1px solid #e2e8f0",
+            padding: "6px 14px",
+            borderRadius: 7,
+            fontSize: 12,
+            fontWeight: activeCategory === "all" ? 700 : 500,
+            cursor: "pointer",
+            boxShadow: activeCategory === "all" ? "0 2px 8px rgba(79, 70, 229, 0.3)" : "none",
+            transition: "all 0.14s ease"
+          }}
+        >
+          All Scenarios (8)
+        </button>
+
+        <button
+          onClick={() => setActiveCategory("ui")}
+          style={{
+            background: activeCategory === "ui" ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "#f8fafc",
+            color: activeCategory === "ui" ? "#ffffff" : "#475569",
+            border: activeCategory === "ui" ? "1px solid #1d4ed8" : "1px solid #e2e8f0",
+            padding: "6px 14px",
+            borderRadius: 7,
+            fontSize: 12,
+            fontWeight: activeCategory === "ui" ? 700 : 500,
+            cursor: "pointer",
+            boxShadow: activeCategory === "ui" ? "0 2px 8px rgba(37, 99, 235, 0.3)" : "none",
+            transition: "all 0.14s ease"
+          }}
+        >
+          UI Changes (Healable)
+        </button>
+
+        <button
+          onClick={() => setActiveCategory("workflow")}
+          style={{
+            background: activeCategory === "workflow" ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)" : "#f8fafc",
+            color: activeCategory === "workflow" ? "#ffffff" : "#475569",
+            border: activeCategory === "workflow" ? "1px solid #6d28d9" : "1px solid #e2e8f0",
+            padding: "6px 14px",
+            borderRadius: 7,
+            fontSize: 12,
+            fontWeight: activeCategory === "workflow" ? 700 : 500,
+            cursor: "pointer",
+            boxShadow: activeCategory === "workflow" ? "0 2px 8px rgba(124, 58, 237, 0.3)" : "none",
+            transition: "all 0.14s ease"
+          }}
+        >
+          Workflow Changes
+        </button>
+
+        <button
+          onClick={() => setActiveCategory("bugs")}
+          style={{
+            background: activeCategory === "bugs" ? "linear-gradient(135deg, #e11d48 0%, #be123c 100%)" : "#f8fafc",
+            color: activeCategory === "bugs" ? "#ffffff" : "#475569",
+            border: activeCategory === "bugs" ? "1px solid #be123c" : "1px solid #e2e8f0",
+            padding: "6px 14px",
+            borderRadius: 7,
+            fontSize: 12,
+            fontWeight: activeCategory === "bugs" ? 700 : 500,
+            cursor: "pointer",
+            boxShadow: activeCategory === "bugs" ? "0 2px 8px rgba(225, 29, 72, 0.3)" : "none",
+            transition: "all 0.14s ease"
+          }}
+        >
+          Real Bugs (Must Fail)
+        </button>
+      </div>
+
+      {/* Grid of 8 Scenario Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 18 }}>
+        {filteredScenarios.map(sc => {
+          const isRunning = runningId === sc.id;
+          const isHealable = sc.expected === "HEALED";
 
           return (
             <div
-              key={m.id}
-              className="card"
+              key={sc.id}
+              className="card-interactive"
               style={{
+                padding: "20px 22px",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
-                borderLeft: `4px solid ${
-                  m.expected_outcome === "HEALED" ? "var(--accent-cyan)" :
-                  (m.expected_outcome === "FAILED" ? "var(--accent-rose)" : "var(--accent-amber)")
-                }`
+                borderLeft: `4px solid ${isHealable ? "#4f46e5" : "#e11d48"}`
               }}
             >
               <div>
+                {/* Card Header Row */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{
-                      background: "#1e293b",
-                      color: "var(--accent-cyan)",
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: 700,
-                      fontFamily: "var(--font-mono)"
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: sc.category === "ui" ? "#eef2ff" : (sc.category === "workflow" ? "#f5f3ff" : "#fff1f2"),
+                      color: sc.category === "ui" ? "#4f46e5" : (sc.category === "workflow" ? "#6d28d9" : "#e11d48"),
+                      border: `1px solid ${sc.category === "ui" ? "#c7d2fe" : (sc.category === "workflow" ? "#ddd6fe" : "#fecdd3")}`
                     }}>
-                      {m.id}
+                      {sc.typeLabel}
                     </span>
-                    <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginTop: 4 }}>
-                      {m.name}
+                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
+                      {sc.name}
                     </h3>
                   </div>
 
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 2 }}>
-                      Expected Outcome:
-                    </div>
-                    <StatusBadge status={m.expected_outcome} />
-                  </div>
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: 9999,
+                    background: isHealable ? "#ecfdf5" : (sc.expected === "REVIEW_REQUIRED" ? "#fffbeb" : "#fff1f2"),
+                    color: isHealable ? "#047857" : (sc.expected === "REVIEW_REQUIRED" ? "#b45309" : "#be123c"),
+                    border: `1px solid ${isHealable ? "#6ee7b7" : (sc.expected === "REVIEW_REQUIRED" ? "#fde68a" : "#fca5a5")}`
+                  }}>
+                    {sc.expectedLabel}
+                  </span>
                 </div>
 
-                <p style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
-                  {m.description}
+                {/* Description */}
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 14 }}>
+                  {sc.description}
                 </p>
 
+                {/* Invariant Tag */}
                 <div style={{
-                  background: "rgba(15, 23, 42, 0.5)",
-                  border: "1px solid var(--border-subtle)",
+                  background: "#f8fafc",
+                  border: "1px solid var(--border-light)",
                   borderRadius: 6,
-                  padding: "8px 12px",
+                  padding: "6px 10px",
                   fontSize: 11,
                   display: "flex",
                   justifyContent: "space-between",
+                  color: "#475569",
                   marginBottom: 16
                 }}>
-                  <span style={{ color: "var(--text-tertiary)" }}>Type: <strong style={{ color: "#fff" }}>{m.mutation_type}</strong></span>
-                  <span style={{ color: "var(--text-tertiary)" }}>Risk: <strong style={{ color: "#fff", textTransform: "uppercase" }}>{m.risk_category}</strong></span>
-                  <span style={{ color: "var(--text-tertiary)" }}>Recorded: <strong style={{ color: "var(--accent-cyan)" }}>{stat?.totalRuns || 0} runs</strong></span>
+                  <span><strong>Invariant Target:</strong> {sc.invariants}</span>
+                  <span style={{ color: "#64748b", fontFamily: "var(--font-mono)", fontSize: 10 }}>{sc.id}</span>
                 </div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
-                <div style={{ fontSize: 12 }}>
-                  {stat && stat.totalRuns > 0 ? (
-                    <span style={{ color: stat.accuracyRate === 100 ? "var(--accent-green)" : "var(--accent-rose)", fontWeight: 700, fontFamily: "var(--font-mono)" }}>
-                      ✓ {stat.accuracyRate}% Empirical Accuracy ({stat.healedRuns || stat.failedRuns || stat.reviewRequiredRuns}/{stat.totalRuns})
-                    </span>
-                  ) : (
-                    <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>Not yet executed in this session</span>
-                  )}
-                </div>
-
-                <button
-                  className="btn btn-primary"
-                  style={{ padding: "6px 14px", fontSize: 12 }}
-                  onClick={() => handleRun(m.id)}
-                  disabled={isRunning}
-                >
-                  {isRunning ? (
-                    <>
-                      <span style={{ display: "inline-block", width: 10, height: 10, border: "2px solid #fff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }}></span>
-                      Executing Run...
-                    </>
-                  ) : (
-                    "▶ Run Scenario"
-                  )}
-                </button>
-              </div>
+              {/* Action Button */}
+              <button
+                className="btn btn-primary"
+                onClick={() => handleRun(sc.id)}
+                disabled={isRunning}
+                style={{
+                  width: "100%",
+                  background: isHealable
+                    ? "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)"
+                    : (sc.expected === "REVIEW_REQUIRED"
+                      ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)"
+                      : "linear-gradient(135deg, #e11d48 0%, #be123c 100%)"),
+                  borderColor: isHealable ? "#4338ca" : (sc.expected === "REVIEW_REQUIRED" ? "#6d28d9" : "#be123c"),
+                  boxShadow: isHealable ? "0 2px 8px rgba(79, 70, 229, 0.3)" : "0 2px 8px rgba(225, 29, 72, 0.3)",
+                  fontSize: 12,
+                  padding: "8px 14px"
+                }}
+              >
+                {isRunning ? (
+                  <>
+                    <RotateCw size={13} className="pulsing-dot" />
+                    <span>Executing Live Run in Playwright...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play size={13} fill="#ffffff" />
+                    <span>Inject Mutation & Run Test</span>
+                  </>
+                )}
+              </button>
             </div>
           );
         })}
-      </div>
-
-      {/* Benchmark Summary Table */}
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-subtle)", background: "rgba(15, 23, 42, 0.4)" }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>
-            Benchmark Metrics & Ground-Truth Verification
-          </h2>
-          <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            Empirical results across all recorded runs. Sample size is strictly displayed with every percentage.
-          </p>
-        </div>
-
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, textAlign: "left" }}>
-          <thead>
-            <tr style={{ background: "rgba(15, 23, 42, 0.6)", color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-subtle)" }}>
-              <th style={{ padding: "12px 20px" }}>SCENARIO ID</th>
-              <th style={{ padding: "12px 16px" }}>NAME</th>
-              <th style={{ padding: "12px 16px" }}>EXPECTED</th>
-              <th style={{ padding: "12px 16px" }}>TOTAL RUNS</th>
-              <th style={{ padding: "12px 16px" }}>HEALED</th>
-              <th style={{ padding: "12px 16px" }}>FAILED</th>
-              <th style={{ padding: "12px 16px" }}>REVIEW REQ.</th>
-              <th style={{ padding: "12px 20px", textAlign: "right" }}>ACCURACY</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(benchmark?.scenarios || []).map(sc => (
-              <tr key={sc.scenarioId} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                <td style={{ padding: "12px 20px", fontFamily: "var(--font-mono)", color: "var(--accent-cyan)" }}>
-                  {sc.scenarioId}
-                </td>
-                <td style={{ padding: "12px 16px", color: "#fff", fontWeight: 600 }}>
-                  {sc.name}
-                </td>
-                <td style={{ padding: "12px 16px" }}>
-                  <StatusBadge status={sc.expectedOutcome} />
-                </td>
-                <td style={{ padding: "12px 16px", fontFamily: "var(--font-mono)" }}>
-                  {sc.totalRuns}
-                </td>
-                <td style={{ padding: "12px 16px", fontFamily: "var(--font-mono)", color: "var(--accent-cyan)" }}>
-                  {sc.healedRuns}
-                </td>
-                <td style={{ padding: "12px 16px", fontFamily: "var(--font-mono)", color: "var(--accent-rose)" }}>
-                  {sc.failedRuns}
-                </td>
-                <td style={{ padding: "12px 16px", fontFamily: "var(--font-mono)", color: "var(--accent-amber)" }}>
-                  {sc.reviewRequiredRuns}
-                </td>
-                <td style={{ padding: "12px 20px", textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
-                  {sc.totalRuns > 0 ? (
-                    <span style={{ color: sc.accuracyRate === 100 ? "var(--accent-green)" : "var(--accent-rose)" }}>
-                      {sc.accuracyRate}%
-                    </span>
-                  ) : (
-                    <span style={{ color: "var(--text-tertiary)" }}>—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   );

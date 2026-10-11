@@ -137,4 +137,67 @@ describe("IntentLock 100% Real Verification Suite", () => {
     expect(run.run.status).toBe("REVIEW_REQUIRED");
     expect(run.run.recovery_count).toBe(0);
   }, 35000);
+
+  it("5. Contract Studio API: create custom test, ping URL, and commit heal", async () => {
+    // Ping URL
+    const pingRes = await fetch(`${API_BASE}/ping-url`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "http://localhost:3000/api/health" })
+    }).then(r => r.json());
+    expect(pingRes.reachable).toBe(true);
+
+    // Create custom test
+    const customTestId = `custom-test-${Date.now()}`;
+    const createTestRes = await fetch(`${API_BASE}/tests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: customTestId,
+        name: "Custom Target Flow",
+        description: "Testing dynamic contract creation",
+        baseUrl: "http://localhost:3001",
+        steps: [
+          {
+            stepId: "step-custom-1",
+            name: "Navigate Home",
+            intent: "Open root page",
+            actionType: "navigate",
+            targetLocator: "/",
+            timeoutMs: 5000,
+            riskCategory: "low"
+          }
+        ],
+        successConditions: [
+          {
+            id: "cond-1",
+            description: "Check URL contains root",
+            type: "ui_url_contains",
+            expected: "3001"
+          }
+        ]
+      })
+    }).then(r => r.json());
+
+    expect(createTestRes.testId).toBe(customTestId);
+    expect(createTestRes.contractVersion).toBe(1);
+
+    // Commit a healed locator
+    const healRes = await fetch(`${API_BASE}/tests/${customTestId}/commit-heal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stepId: "step-custom-1",
+        newLocator: "/catalog"
+      })
+    }).then(r => r.json());
+
+    expect(healRes.newContractVersion).toBe(2);
+    expect(healRes.newLocator).toBe("/catalog");
+
+    // Verify fetched contract reflects v2 and updated selector
+    const fetchedSpec = await fetch(`${API_BASE}/tests/${customTestId}`).then(r => r.json());
+    expect(fetchedSpec.active_contract_version).toBe(2);
+    expect(fetchedSpec.contract.steps[0].targetLocator).toBe("/catalog");
+  });
 });

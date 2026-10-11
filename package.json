@@ -10,7 +10,8 @@
     "dev:api": "pnpm --filter @intentlock/api dev",
     "dev:web": "pnpm --filter @intentlock/web dev",
     "build": "pnpm -r run build",
-    "test": "pnpm -r run test"
+    "test": "pnpm -r run test",
+    "test:e2e": "vitest run tests/e2e/workbench.test.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

@@ -1,25 +1,90 @@
 :root {
-  --bg-app: #080c14;
-  --bg-surface: #0f172a;
-  --bg-card: #131c31;
-  --bg-card-hover: #1a2642;
-  --border-subtle: #1e293b;
-  --border-medium: #2a374f;
-  --border-active: #3b82f6;
+  /* ========================================================
+     THEME: LINEAR ALABASTER & ELECTRIC INDIGO
+     Surgical, Luminous, High-Density Enterprise SaaS
+     ======================================================== */
+  
+  /* Canvas & Surfaces */
+  --bg-app: #f8fafc;
+  --bg-sidebar: #ffffff;
+  --bg-sidebar-hover: #f1f5f9;
+  --bg-sidebar-active: #eef2ff;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f8fafc;
+  --bg-card-hover: #ffffff;
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-tertiary: #64748b;
+  /* Hairline Borders */
+  --border-light: rgba(226, 232, 240, 0.85);
+  --border-subtle: #f1f5f9;
+  --border-medium: #cbd5e1;
+  --border-dark: #0f172a;
+  --border-indigo: rgba(99, 102, 241, 0.35);
 
-  --accent-blue: #3b82f6;
-  --accent-cyan: #06b6d4;
-  --accent-green: #10b981;
-  --accent-rose: #f43f5e;
-  --accent-amber: #f59e0b;
-  --accent-purple: #a855f7;
+  /* Typography */
+  --text-primary: #0f172a;       /* Deep Obsidian */
+  --text-secondary: #475569;     /* Slate */
+  --text-tertiary: #94a3b8;      /* Muted Metadata */
+  --text-inverse: #ffffff;
+  --text-brand: #4f46e5;         /* Electric Indigo */
 
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Electric Indigo Brand Palette */
+  --indigo-50: #eef2ff;
+  --indigo-100: #e0e7ff;
+  --indigo-200: #c7d2fe;
+  --indigo-500: #6366f1;
+  --indigo-600: #4f46e5;
+  --indigo-700: #4338ca;
+
+  /* Semantic State Colors */
+  --emerald-50: #f0fdf4;
+  --emerald-100: #dcfce7;
+  --emerald-200: #bbf7d0;
+  --emerald-500: #10b981;
+  --emerald-600: #059669;
+  --emerald-700: #047857;
+
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+
+  --rose-50: #fff1f2;
+  --rose-100: #ffe4e6;
+  --rose-200: #fecdd3;
+  --rose-500: #f43f5e;
+  --rose-600: #e11d48;
+  --rose-700: #be123c;
+
+  --amber-50: #fffbeb;
+  --amber-100: #fef3c7;
+  --amber-200: #fde68a;
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
+
+  /* Typography Stacks */
+  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Geist Mono', monospace;
+
+  /* Multi-Layered Soft Ambient Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -4px rgba(15, 23, 42, 0.02);
+  --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
+  --shadow-hover: 0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --shadow-indigo: 0 4px 14px -2px rgba(79, 70, 229, 0.3);
+  --shadow-emerald: 0 4px 14px -2px rgba(16, 185, 129, 0.25);
+
+  /* Legacy & View Compatibility Aliases */
+  --bg-surface: var(--bg-card);
+  --accent-gold: var(--indigo-600);
+  --accent-green: var(--emerald-600);
+  --accent-rose: var(--rose-600);
+  --font-display: var(--font-sans);
+  --shadow-brutalist: var(--shadow-card);
+  --shadow-brutalist-sm: var(--shadow-sm);
+  --shadow-brutalist-lg: var(--shadow-hover);
 }
 
 * {
@@ -30,11 +95,16 @@
 
 body {
   background-color: var(--bg-app);
+  background-image: 
+    radial-gradient(ellipse 60% 30% at 50% 0%, rgba(99, 102, 241, 0.06) 0%, transparent 80%),
+    radial-gradient(ellipse 40% 20% at 90% 15%, rgba(56, 189, 248, 0.04) 0%, transparent 70%);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: var(--font-sans);
   min-height: 100vh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 code, pre {
@@ -47,97 +117,317 @@ code, pre {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-app);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-medium);
-  border-radius: 3px;
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: #94a3b8;
 }
 
-/* Common Utilities */
+/* ========================================================
+   BUTTONS (Tactile Spring Physics)
+   ======================================================== */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.15s ease-in-out;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
   text-decoration: none;
-}
-.btn-primary {
-  background: var(--accent-blue);
-  color: #fff;
-}
-.btn-primary:hover {
-  background: #2563eb;
-}
-.btn-secondary {
-  background: var(--bg-card);
-  border-color: var(--border-medium);
-  color: var(--text-primary);
-}
-.btn-secondary:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--text-tertiary);
-}
-.btn-success {
-  background: #065f46;
-  border-color: #059669;
-  color: #ecfdf5;
-}
-.btn-success:hover {
-  background: #047857;
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
 }
 
+.btn:active {
+  transform: scale(0.98);
+}
+
+/* Primary Button: Electric Indigo Gradient */
+.btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Secondary Button: Crisp Pure White */
+.btn-secondary {
+  background: #ffffff;
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+}
+.btn-secondary:hover {
+  background: #f8fafc;
+  border-color: var(--border-medium);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  background: #ffffff;
+  color: var(--rose-600);
+  border: 1px solid var(--rose-200);
+}
+.btn-danger:hover {
+  background: var(--rose-50);
+  border-color: var(--rose-500);
+  transform: translateY(-1px);
+}
+
+.btn-blue {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28);
+}
+.btn-blue:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ========================================================
+   CARDS & CONTAINERS (Alabaster Glass)
+   ======================================================== */
+.card-clean {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease;
+}
+
+.card-clean:hover {
+  border-color: var(--border-medium);
+}
+
+.card-interactive {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.22s ease;
+  cursor: pointer;
+}
+
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--border-indigo);
+}
+
+/* Luminous Alabaster Hero Card */
+.hero-card-alabaster {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px -6px rgba(79, 70, 229, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-card-alabaster::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #4f46e5 0%, #38bdf8 50%, #10b981 100%);
+}
+
+/* ========================================================
+   ICON MICRO-PODS (Squircle Badges)
+   ======================================================== */
+.icon-pod {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.icon-pod-indigo {
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  border: 1px solid rgba(199, 210, 254, 0.8);
+  color: #4f46e5;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.12);
+}
+
+.icon-pod-emerald {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 1px solid rgba(167, 243, 208, 0.8);
+  color: #059669;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.12);
+}
+
+.icon-pod-blue {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid rgba(191, 219, 254, 0.8);
+  color: #2563eb;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
+}
+
+.icon-pod-rose {
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  border: 1px solid rgba(254, 205, 211, 0.8);
+  color: #e11d48;
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.12);
+}
+
+.icon-pod-purple {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+  border: 1px solid rgba(233, 213, 255, 0.8);
+  color: #9333ea;
+  box-shadow: 0 2px 6px rgba(147, 51, 234, 0.12);
+}
+
+.icon-pod-amber {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1px solid rgba(253, 230, 138, 0.8);
+  color: #d97706;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.12);
+}
+
+/* ========================================================
+   STATUS BADGES (Glossy Micro-Pills)
+   ======================================================== */
+.badge-clean,
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   padding: 3px 10px;
-  border-radius: 12px;
+  border-radius: 9999px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
-  font-family: var(--font-mono);
-}
-.badge-passed {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-.badge-healed {
-  background: rgba(6, 182, 212, 0.15);
-  color: #22d3ee;
-  border: 1px solid rgba(6, 182, 212, 0.35);
-}
-.badge-failed {
-  background: rgba(244, 63, 94, 0.15);
-  color: #fb7185;
-  border: 1px solid rgba(244, 63, 94, 0.3);
-}
-.badge-review {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-.badge-running {
-  background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
-  border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 20px;
+.badge-running {
+  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.12);
+}
+
+.badge-passed {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
+}
+
+.badge-healed {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  color: #047857;
+  border: 1px solid #6ee7b7;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.15);
+}
+
+.badge-failed {
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  color: #be123c;
+  border: 1px solid #fca5a5;
+  box-shadow: 0 1px 3px rgba(225, 29, 72, 0.1);
+}
+
+.badge-recovering {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+  color: #7e22ce;
+  border: 1px solid #d8b4fe;
+  box-shadow: 0 1px 3px rgba(126, 34, 206, 0.1);
+}
+
+.badge-review {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #b45309;
+  border: 1px solid #fde68a;
+  box-shadow: 0 1px 3px rgba(217, 119, 6, 0.1);
+}
+
+/* ========================================================
+   MICRO-ANIMATIONS
+   ======================================================== */
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+.pulsing-dot {
+  animation: pulseGlow 1.8s infinite ease-in-out;
+}
+
+/* Living Heartbeat Halo for Live Tests */
+@keyframes livePulseHalo {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+    transform: scale(0.98);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+    transform: scale(1.04);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    transform: scale(0.98);
+  }
+}
+
+.pulsing-emerald-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10b981;
+  animation: livePulseHalo 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  display: inline-block;
+}
+
+/* Ambient Shimmer Sweep */
+@keyframes shimmerSweep {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  100% { transform: translateX(250%) skewX(-20deg); }
+}
+
+.shimmer-active {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 100%
+  );
+  animation: shimmerSweep 4s ease-in-out infinite;
+  pointer-events: none;
 }

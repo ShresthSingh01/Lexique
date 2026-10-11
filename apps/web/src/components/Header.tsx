@@ -11,60 +11,71 @@ export const Header: React.FC<Props> = ({ activeTab, setActiveTab, onRunBaseline
   return (
     <header style={{
       background: "var(--bg-surface)",
-      borderBottom: "1px solid var(--border-subtle)",
-      padding: "12px 24px",
+      borderBottom: "1px solid var(--border-medium)",
+      padding: "14px 28px",
       display: "flex",
       justifyContent: "space-between",
-      alignItems: "center"
+      alignItems: "center",
+      boxShadow: "0 2px 0px rgba(0,0,0,0.5)"
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: "linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)",
+            width: 34,
+            height: 34,
+            borderRadius: 4,
+            background: "linear-gradient(135deg, #e0a96d 0%, #b88349 100%)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "0 0 16px rgba(59, 130, 246, 0.4)"
+            boxShadow: "2px 2px 0px #000",
+            border: "1px solid #f0be85"
           }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12100d" strokeWidth="2.5">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-0.02em", color: "#fff" }}>
+            <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.01em", color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
               IntentLock
             </div>
-            <div style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-              EVIDENCE-GATED SELF-HEALING E2E
+            <div style={{ fontSize: 10, color: "var(--accent-gold)", fontFamily: "var(--font-mono)", letterSpacing: "0.08em", fontWeight: 600 }}>
+              EVIDENCE-GATED E2E ORACLE
             </div>
           </div>
         </div>
 
-        <nav style={{ display: "flex", gap: 4, background: "var(--bg-app)", padding: 4, borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+        <nav style={{
+          display: "flex",
+          gap: 4,
+          background: "var(--bg-app)",
+          padding: 4,
+          borderRadius: 4,
+          border: "1px solid var(--border-subtle)",
+          boxShadow: "inset 1px 1px 0px #000"
+        }}>
           {[
-            { id: "overview", label: "Overview" },
-            { id: "contract", label: "Intent Contract" },
-            { id: "explorer", label: "Run Explorer" },
-            { id: "mutation-lab", label: "Mutation Lab" }
+            { id: "studio", label: "⚡ Contract Studio" },
+            { id: "mutations", label: "🧪 Version B Lab" },
+            { id: "explorer", label: "🔍 Live Inspector" },
+            { id: "overview", label: "📊 Run History & Metrics" }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
                 background: activeTab === tab.id ? "var(--bg-card)" : "transparent",
-                color: activeTab === tab.id ? "var(--text-primary)" : "var(--text-secondary)",
-                border: "none",
-                borderRadius: 6,
+                color: activeTab === tab.id ? "var(--accent-gold)" : "var(--text-secondary)",
+                border: activeTab === tab.id ? "1px solid var(--border-medium)" : "1px solid transparent",
+                borderRadius: 4,
                 padding: "6px 14px",
                 fontSize: 13,
                 fontWeight: activeTab === tab.id ? 700 : 500,
                 cursor: "pointer",
-                transition: "all 0.15s ease",
-                boxShadow: activeTab === tab.id ? "0 1px 3px rgba(0,0,0,0.3)" : "none"
+                transition: "all 0.12s ease",
+                boxShadow: activeTab === tab.id ? "2px 2px 0px #000" : "none",
+                fontFamily: "var(--font-sans)"
               }}
             >
               {tab.label}
@@ -73,21 +84,23 @@ export const Header: React.FC<Props> = ({ activeTab, setActiveTab, onRunBaseline
         </nav>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{
           display: "flex",
           alignItems: "center",
           gap: 6,
-          background: "rgba(16, 185, 129, 0.1)",
-          border: "1px solid rgba(16, 185, 129, 0.25)",
-          padding: "4px 10px",
-          borderRadius: 14,
-          fontSize: 12,
-          color: "#34d399",
-          fontFamily: "var(--font-mono)"
+          background: "rgba(94, 184, 133, 0.12)",
+          border: "1px solid rgba(94, 184, 133, 0.35)",
+          padding: "5px 10px",
+          borderRadius: 3,
+          fontSize: 11,
+          fontWeight: 700,
+          color: "#6ec493",
+          fontFamily: "var(--font-mono)",
+          boxShadow: "1px 1px 0px #000"
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }}></span>
-          SANDBOX (PORT 3001)
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-green)", boxShadow: "0 0 6px var(--accent-green)" }}></span>
+          HEADLESS=FALSE (LIVE)
         </div>
 
         <button
@@ -98,15 +111,15 @@ export const Header: React.FC<Props> = ({ activeTab, setActiveTab, onRunBaseline
         >
           {isRunningBaseline ? (
             <>
-              <span style={{ display: "inline-block", width: 12, height: 12, border: "2px solid #fff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }}></span>
-              Running...
+              <span style={{ display: "inline-block", width: 12, height: 12, border: "2px solid #12100d", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }}></span>
+              Executing Test Run...
             </>
           ) : (
             <>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
-              Run Baseline Test
+              Run Active Test
             </>
           )}
         </button>
