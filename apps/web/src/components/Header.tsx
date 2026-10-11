@@ -1,4 +1,5 @@
 import React from "react";
+import { OjastraLogo } from "./shared/OjastraLogo.js";
 
 interface Props {
   activeTab: string;
@@ -21,27 +22,25 @@ export const Header: React.FC<Props> = ({ activeTab, setActiveTab, onRunBaseline
       <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
-            width: 34,
-            height: 34,
-            borderRadius: 4,
-            background: "linear-gradient(135deg, #e0a96d 0%, #b88349 100%)",
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            background: "#ffffff",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "2px 2px 0px #000",
-            border: "1px solid #f0be85"
+            boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+            border: "1px solid var(--border-medium)",
+            flexShrink: 0
           }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12100d" strokeWidth="2.5">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-            </svg>
+            <OjastraLogo size={30} />
           </div>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.01em", color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>
               Ojastra
             </div>
             <div style={{ fontSize: 10, color: "var(--accent-gold)", fontFamily: "var(--font-mono)", letterSpacing: "0.08em", fontWeight: 600 }}>
-              EVIDENCE-GATED E2E ORACLE
+              TEST AUTOMATION WORKBENCH
             </div>
           </div>
         </div>

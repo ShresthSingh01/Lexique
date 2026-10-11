@@ -6,9 +6,9 @@ import {
   FlaskConical,
   Store,
   Settings,
-  ShieldCheck,
   Cpu
 } from "lucide-react";
+import { OjastraLogo } from "../shared/OjastraLogo.js";
 
 export type TabId = "overview" | "tests" | "runs" | "mutation-lab" | "demo-app" | "settings";
 
@@ -50,18 +50,19 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning }) 
         borderBottom: "1px solid var(--border-light)"
       }}>
         <div style={{
-          width: 36,
-          height: 36,
+          width: 38,
+          height: 38,
           borderRadius: 10,
-          background: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
+          background: "#ffffff",
+          border: "1px solid var(--border-medium)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#ffffff",
-          boxShadow: "0 3px 10px rgba(79, 70, 229, 0.35)",
-          flexShrink: 0
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+          flexShrink: 0,
+          padding: 3
         }}>
-          <ShieldCheck size={20} />
+          <OjastraLogo size={32} />
         </div>
         <div>
           <div style={{
