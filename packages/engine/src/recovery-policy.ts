@@ -4,6 +4,7 @@ import {
   RecoveryProposal,
   WorkflowStep
 } from "@intentlock/contracts";
+import { SemanticVectorEngine } from "./semantic-vsm.js";
 
 export class RecoveryPolicyGate {
   /**
@@ -60,6 +61,17 @@ export class RecoveryPolicyGate {
       };
     }
     reasonCodes.push("CANDIDATE_INTERACTABLE");
+
+    // Rule 4.5: Destructive action filter via Semantic Vector Engine
+    if (SemanticVectorEngine.isDestructiveAction(candidate.name || "")) {
+      reasonCodes.push("DESTRUCTIVE_ACTION_FORBIDDEN");
+      return {
+        decision: "REJECTED",
+        reasonCodes,
+        explanation: `Candidate '${candidate.name}' flagged by Semantic Vector Engine as a destructive/canceling action. Strictly prohibited during recovery.`
+      };
+    }
+    reasonCodes.push("NON_DESTRUCTIVE_VERIFIED");
 
     // Rule 5: Candidate must be unique
     if (!candidate.isUnique) {

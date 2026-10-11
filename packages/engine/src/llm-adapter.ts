@@ -1,10 +1,10 @@
 import { ObservedCandidate, RecoveryProposal, RecoveryProposalSchema, WorkflowStep } from "@intentlock/contracts";
 import { CONFIG } from "./config.js";
+import { SemanticVectorEngine } from "./semantic-vsm.js";
 
 export class LlmAdapter {
   /**
-   * Prompts the LLM with structured step intent and observed candidates.
-   * Returns a validated RecoveryProposal.
+   * Evaluates recovery proposals using Gemini, OpenAI, or the local TF-IDF Cosine Vector Space Engine.
    */
   public static async proposeRecovery(step: WorkflowStep, candidates: ObservedCandidate[]): Promise<{
     proposal: RecoveryProposal;
@@ -51,9 +51,33 @@ ${JSON.stringify(candidateSummary, null, 2)}
 
 Select the candidate that safely fulfills this step intent, or return NO_SAFE_MATCH.`;
 
-    const apiKey = CONFIG.mistralApiKey || CONFIG.openaiApiKey;
-    const baseUrl = CONFIG.mistralApiKey ? CONFIG.mistralBaseUrl : CONFIG.openaiBaseUrl;
-    const model = CONFIG.llmModel;
+    // 1. Determine active cloud LLM provider based on CONFIG.llmProvider
+    let apiKey = "";
+    let baseUrl = "";
+    let model = "";
+
+    const provider = (CONFIG.llmProvider || "").toLowerCase();
+    if ((provider === "gemini" || !provider) && CONFIG.geminiApiKey) {
+      apiKey = CONFIG.geminiApiKey;
+      baseUrl = CONFIG.geminiBaseUrl;
+      model = CONFIG.geminiModel;
+    } else if (provider === "mistral" && CONFIG.mistralApiKey) {
+      apiKey = CONFIG.mistralApiKey;
+      baseUrl = CONFIG.mistralBaseUrl;
+      model = CONFIG.llmModel;
+    } else if (provider === "openai" && CONFIG.openaiApiKey) {
+      apiKey = CONFIG.openaiApiKey;
+      baseUrl = CONFIG.openaiBaseUrl;
+      model = CONFIG.llmModel;
+    } else if (CONFIG.geminiApiKey) {
+      apiKey = CONFIG.geminiApiKey;
+      baseUrl = CONFIG.geminiBaseUrl;
+      model = CONFIG.geminiModel;
+    } else if (CONFIG.mistralApiKey) {
+      apiKey = CONFIG.mistralApiKey;
+      baseUrl = CONFIG.mistralBaseUrl;
+      model = CONFIG.llmModel;
+    }
 
     if (apiKey) {
       try {
@@ -90,63 +114,86 @@ Select the candidate that safely fulfills this step intent, or return NO_SAFE_MA
           }
         } else {
           const errText = await response.text();
-          console.warn(`[LlmAdapter] Provider HTTP error ${response.status}: ${errText}`);
+          console.warn(`[LlmAdapter] Provider HTTP error ${response.status}: ${errText}. Cascading to Vector Space Engine.`);
         }
       } catch (err: any) {
-        console.warn(`[LlmAdapter] LLM request failed (${err.message}). Using bounded policy matcher.`);
+        console.warn(`[LlmAdapter] Cloud LLM error (${err.message}). Cascading to Vector Space Engine.`);
       }
     }
 
-    // Deterministic fallback matcher if LLM is unavailable or unconfigured
-    const matched = this.fallbackSemanticMatcher(step, candidates);
+    // 2. Real In-Memory TF-IDF Cosine Vector Space Engine
+    const vectorProposal = this.evaluateWithVectorSpaceEngine(step, candidates);
     return {
-      proposal: matched,
-      modelName: "deterministic-policy-engine",
+      proposal: vectorProposal,
+      modelName: "tf-idf-cosine-vector-engine",
       latencyMs: Date.now() - startTime
     };
   }
 
-  private static fallbackSemanticMatcher(step: WorkflowStep, candidates: ObservedCandidate[]): RecoveryProposal {
-    const intentLower = step.intent.toLowerCase();
-    const nameLower = step.name.toLowerCase();
+  /**
+   * Real mathematical vector space ranking with TF-IDF and Cosine Similarity.
+   */
+  private static evaluateWithVectorSpaceEngine(step: WorkflowStep, candidates: ObservedCandidate[]): RecoveryProposal {
+    // Check for destructive actions
+    const filteredCandidates = candidates.filter(c => !SemanticVectorEngine.isDestructiveAction(c.name || ""));
 
-    // Look for candidates that semantically match the step
-    const matched = candidates.filter(c => {
-      const cText = (c.name || c.text || "").toLowerCase();
-      if (!c.isVisible || !c.isEnabled) return false;
-      return (
-        cText.includes("checkout") ||
-        cText.includes("place order") ||
-        cText.includes("complete purchase") ||
-        cText.includes("order")
-      );
-    });
-
-    if (matched.length === 1 && matched[0].isUnique) {
+    if (filteredCandidates.length === 0) {
       return {
-        decision: "SELECT_CANDIDATE",
-        targetCandidateId: matched[0].candidateId,
-        actionType: step.actionType,
-        expectedTransition: step.expectedTransition || "checkout_transition",
-        rationale: `Unique candidate '${matched[0].name}' (${matched[0].candidateId}) in section '${matched[0].sectionContext}' uniquely matches the intent '${step.intent}'.`,
+        decision: "NO_SAFE_MATCH",
+        rationale: "All observed elements were filtered out by safety policy as potentially destructive or irrelevant.",
         confidence: 0.95,
         evidenceRefs: []
       };
     }
 
-    if (matched.length > 1) {
+    // Rank candidates using Cosine Similarity
+    const ranked = SemanticVectorEngine.rankCandidates(step.intent, filteredCandidates);
+
+    if (ranked.length === 0) {
       return {
         decision: "NO_SAFE_MATCH",
-        rationale: `Ambiguity detected: found ${matched.length} candidates matching action intent (${matched.map(m => m.name).join(", ")}). Fail closed to prevent arbitrary clicks.`,
+        rationale: "No candidates available for vector space ranking.",
         confidence: 0.9,
+        evidenceRefs: []
+      };
+    }
+
+    const top = ranked[0];
+
+    // Ambiguity Detection: If 2nd candidate is also high scoring and close to top candidate
+    if (ranked.length > 1) {
+      const runnerUp = ranked[1];
+      const delta = top.similarity - runnerUp.similarity;
+
+      // Both candidates have high similarity and difference is very small (< 0.05) or names identical
+      if ((top.similarity >= 0.65 && runnerUp.similarity >= 0.65 && delta < 0.05) ||
+          (top.candidateName.toLowerCase() === runnerUp.candidateName.toLowerCase() && top.similarity >= 0.65)) {
+        return {
+          decision: "NO_SAFE_MATCH",
+          rationale: `Vector Ambiguity Detected: Top candidate '${top.candidateName}' (sim: ${top.similarity}) and runner-up '${runnerUp.candidateName}' (sim: ${runnerUp.similarity}) have overlapping cosine vectors (delta: ${delta.toFixed(3)}). Fail closed to prevent arbitrary clicks.`,
+          confidence: Number(top.similarity.toFixed(2)),
+          evidenceRefs: []
+        };
+      }
+    }
+
+    // Single strong match
+    if (top.similarity >= 0.50 && top.candidate.isUnique && top.candidate.isVisible) {
+      return {
+        decision: "SELECT_CANDIDATE",
+        targetCandidateId: top.candidateId,
+        actionType: step.actionType,
+        expectedTransition: step.expectedTransition || "next_state",
+        rationale: `TF-IDF Cosine Vector Engine selected '${top.candidateName}' (${top.candidateId}) with cosine similarity score ${top.similarity} matching intent '${step.intent}'.`,
+        confidence: top.similarity,
         evidenceRefs: []
       };
     }
 
     return {
       decision: "NO_SAFE_MATCH",
-      rationale: "No safe candidate matching the step intent was found among observed elements.",
-      confidence: 0.9,
+      rationale: `Top candidate '${top.candidateName}' reached cosine similarity ${top.similarity}, which is below the safe acceptance threshold (0.50).`,
+      confidence: top.similarity,
       evidenceRefs: []
     };
   }

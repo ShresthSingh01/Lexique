@@ -4,6 +4,7 @@ export * from "./seed.js";
 export * from "./evidence-recorder.js";
 export * from "./failure-classifier.js";
 export * from "./stagehand-adapter.js";
+export * from "./semantic-vsm.js";
 export * from "./llm-adapter.js";
 export * from "./recovery-policy.js";
 export * from "./outcome-verifier.js";

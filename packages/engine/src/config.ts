@@ -19,12 +19,15 @@ export const CONFIG = {
   databasePath: path.resolve(process.cwd(), process.env.DATABASE_PATH || "storage/intentlock.db"),
 
   // LLM Configuration
-  llmProvider: process.env.LLM_PROVIDER || (process.env.MISTRAL_API_KEY ? "mistral" : "openai"),
+  llmProvider: process.env.LLM_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : (process.env.MISTRAL_API_KEY ? "mistral" : "openai")),
+  geminiApiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "",
+  geminiBaseUrl: process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai",
+  geminiModel: process.env.GEMINI_MODEL || "gemini-1.5-flash",
   mistralApiKey: process.env.MISTRAL_API_KEY || "",
   mistralBaseUrl: process.env.MISTRAL_BASE_URL || "https://api.mistral.ai/v1",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openaiBaseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
-  llmModel: process.env.LLM_MODEL || "mistral-small-latest",
+  llmModel: process.env.LLM_MODEL || (process.env.GEMINI_API_KEY ? "gemini-1.5-flash" : "mistral-small-latest"),
   llmTimeoutMs: parseInt(process.env.LLM_TIMEOUT_MS || "20000", 10),
   maxRecoveryAttemptsPerStep: 1
 };
