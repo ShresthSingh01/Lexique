@@ -23,7 +23,7 @@ export class EvidenceRecorder {
     const relativePath = `runs/${this.runId}/artifacts/${filename}`;
 
     try {
-      await page.screenshot({ path: absolutePath, fullPage: true });
+      await page.screenshot({ path: absolutePath, fullPage: false });
       const now = new Date().toISOString();
 
       db.prepare(`
