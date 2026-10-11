@@ -54,8 +54,8 @@ function Start-WorkspaceService {
         [string]$LogName
     )
 
-    $logPath = Join-Path $env:TEMP "intentlock-$LogName.out.log"
-    $errorLogPath = Join-Path $env:TEMP "intentlock-$LogName.err.log"
+    $logPath = Join-Path $env:TEMP "ojastra-$LogName.out.log"
+    $errorLogPath = Join-Path $env:TEMP "ojastra-$LogName.err.log"
     $process = Start-Process `
         -FilePath "pnpm.cmd" `
         -ArgumentList $Command `
@@ -68,7 +68,7 @@ function Start-WorkspaceService {
     return $process
 }
 
-function Run-IntentLockTest {
+function Run-OjastraTest {
     param(
         [string]$Label,
         [string]$ScenarioId = ""
@@ -133,7 +133,7 @@ function Run-IntentLockTest {
 }
 
 try {
-    Write-Host "IntentLock terminal showcase" -ForegroundColor Cyan
+    Write-Host "Ojastra terminal showcase" -ForegroundColor Cyan
     Write-Host "Starting backend services..."
 
     $demoProcess = Start-WorkspaceService -Command "dev:demo" -LogName "demo"
@@ -151,10 +151,10 @@ try {
         -Method "Post" |
         Out-Null
 
-    $baseline = Run-IntentLockTest -Label "1. NORMAL BASELINE" 
-    $healed = Run-IntentLockTest -Label "2. SAFE UI DRIFT RECOVERY" -ScenarioId "M01_RENAME_TARGET"
-    $failed = Run-IntentLockTest -Label "3. REAL BUSINESS FAILURE" -ScenarioId "M06_WRONG_TOTAL"
-    $review = Run-IntentLockTest -Label "4. AMBIGUOUS CANDIDATE" -ScenarioId "M05_DUPLICATE_LABEL"
+    $baseline = Run-OjastraTest -Label "1. NORMAL BASELINE" 
+    $healed = Run-OjastraTest -Label "2. SAFE UI DRIFT RECOVERY" -ScenarioId "M01_RENAME_TARGET"
+    $failed = Run-OjastraTest -Label "3. REAL BUSINESS FAILURE" -ScenarioId "M06_WRONG_TOTAL"
+    $review = Run-OjastraTest -Label "4. AMBIGUOUS CANDIDATE" -ScenarioId "M05_DUPLICATE_LABEL"
 
     Write-Host ""
     Write-Host "================ BENCHMARK ================" -ForegroundColor Cyan
@@ -173,7 +173,7 @@ try {
 
     Write-Host "================ EVIDENCE ================" -ForegroundColor Cyan
     foreach ($run in @($baseline, $healed, $failed, $review)) {
-        Write-Host "$($run.run.status): D:\LEXIQUE\storage\runs\$($run.run.id)"
+        Write-Host "$($run.run.status): storage\runs\$($run.run.id)"
     }
 
     Write-Host ""

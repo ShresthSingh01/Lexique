@@ -21,7 +21,7 @@ function renderPage(title: string, bodyContent: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} — IntentLock Demo Store</title>
+  <title>${title} — Ojastra Demo Store</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -62,7 +62,7 @@ function renderPage(title: string, bodyContent: string): string {
 <body>
   <header>
     <a href="/" class="brand">
-      <span>🔒</span> IntentLock Demo Store ${badge}
+      <span>🔒</span> Ojastra Demo Store ${badge}
     </a>
     <div class="nav-links">
       <a href="/">Products</a>
@@ -74,7 +74,7 @@ function renderPage(title: string, bodyContent: string): string {
     ${bodyContent}
   </main>
   <footer>
-    IntentLock Controlled Test Environment — Local Origin http://localhost:${PORT}
+    Ojastra Controlled Test Environment — Local Origin http://localhost:${PORT}
   </footer>
 </body>
 </html>`;
@@ -104,7 +104,7 @@ app.get("/", (req, res) => {
   res.send(renderPage("Catalog", `
     <div style="margin-bottom: 24px;">
       <h1 style="font-size: 24px; margin-bottom: 8px;">Software Testing Tools Catalog</h1>
-      <p style="color: var(--muted); font-size: 14px;">Select an item below to run the deterministic IntentLock checkout verification suite.</p>
+      <p style="color: var(--muted); font-size: 14px;">Select an item below to run the deterministic Ojastra checkout verification suite.</p>
     </div>
     ${productCards}
   `));
@@ -268,7 +268,7 @@ app.get("/checkout", (req, res) => {
         </div>
         <div class="form-group">
           <label for="customerEmail">Email Address</label>
-          <input type="email" id="customerEmail" name="customerEmail" value="alex@intentlock.internal" required>
+          <input type="email" id="customerEmail" name="customerEmail" value="alex@ojastra.internal" required>
         </div>
         <div class="form-group">
           <label for="cardNumber">Test Card Number (Synthetic Sandbox)</label>
@@ -456,5 +456,5 @@ app.get("/api/orders", (req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`[IntentLock Demo App] Running on http://localhost:${PORT}`);
+  console.log(`[Ojastra Demo App] Running on http://localhost:${PORT}`);
 });

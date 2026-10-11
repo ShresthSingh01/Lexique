@@ -186,11 +186,11 @@ export const TestEditorView: React.FC<Props> = ({
 
   // Dynamically generated Playwright code from contract
   const generatedCode = `import { test, expect } from '@playwright/test';
-import { IntentLockOracle } from '@intentlock/oracle';
+import { OjastraOracle } from '@ojastra/oracle';
 
-test.describe('E2E Checkout - IntentLock Protected', () => {
+test.describe('E2E Checkout - Ojastra Protected', () => {
   test('${title}', async ({ page }) => {
-    const oracle = new IntentLockOracle({ apiUrl: 'http://localhost:3000' });
+    const oracle = new OjastraOracle({ apiUrl: 'http://localhost:3000' });
 
 ${displaySteps
   .map(
@@ -563,7 +563,7 @@ ${displaySteps
               }}
             >
               If order total deviates from $54.00, or duplicate submissions
-              occur, IntentLock <strong>abstained from healing</strong> and flags
+              occur, Ojastra <strong>abstained from healing</strong> and flags
               a hard business regression.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

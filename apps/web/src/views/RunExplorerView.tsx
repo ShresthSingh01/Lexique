@@ -14,10 +14,14 @@ import {
   Terminal,
   Activity,
   Layers,
+  GitCompare,
+  Eye,
+  Split,
   UserRoundCheck,
   XCircle,
   MessageSquareText
 } from "lucide-react";
+import { VersionSplitView } from "../components/shared/VersionSplitView.js";
 
 interface Props {
   runDetail: RunDetail | null;
@@ -35,7 +39,8 @@ export const RunExplorerView: React.FC<Props> = ({
   isRunning = false
 }) => {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"diagnostics" | "recovery" | "verifier" | "events">("diagnostics");
+  const [activeTab, setActiveTab] = useState<"diagnostics" | "split" | "recovery" | "verifier" | "events">("diagnostics");
+  const [centerViewMode, setCenterViewMode] = useState<"split" | "viewport">("split");
   const [committing, setCommitting] = useState(false);
   const [commitStatus, setCommitStatus] = useState<string | null>(null);
   const [reviewCandidateId, setReviewCandidateId] = useState("");
@@ -64,7 +69,7 @@ export const RunExplorerView: React.FC<Props> = ({
           No Active Test Run Selected
         </h2>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 520, margin: "0 auto 24px auto", lineHeight: 1.6 }}>
-          Select a test execution from the Overview table, or launch a live baseline run to inspect actual Playwright viewport screenshots, Stagehand candidate sets, and database verification receipts.
+          Select a test execution from the Runs table, or launch a baseline run to inspect viewport screenshots, candidate sets, and database verification results.
         </p>
         {onRunBaseline && (
           <button className="btn btn-primary" onClick={onRunBaseline} disabled={isRunning} style={{ padding: "10px 22px" }}>
@@ -369,47 +374,104 @@ export const RunExplorerView: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Screenshot Evidence Header */}
+          {/* Screenshot Evidence / Split View Header */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
               <h3 style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)" }}>
-                Playwright Viewport Evidence Capture
+                {centerViewMode === "split" ? "Version A vs Version B Visual Markup" : "Playwright Viewport Evidence Capture"}
               </h3>
               <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                Real browser viewport captured for this Playwright step attempt.
+                {centerViewMode === "split"
+                  ? "Side-by-side comparative split with marked up changes and invariant verification."
+                  : "Real browser viewport captured for this Playwright step attempt."}
               </p>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* View Mode Toggle */}
+              <div style={{ display: "flex", gap: 3, background: "#f1f5f9", padding: 3, borderRadius: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setCenterViewMode("split")}
+                  style={{
+                    background: centerViewMode === "split" ? "#ffffff" : "transparent",
+                    color: centerViewMode === "split" ? "#4f46e5" : "var(--text-secondary)",
+                    border: "none",
+                    borderRadius: 6,
+                    padding: "5px 10px",
+                    fontSize: 11,
+                    fontWeight: centerViewMode === "split" ? 700 : 500,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    boxShadow: centerViewMode === "split" ? "0 1px 3px rgba(0,0,0,0.06)" : "none"
+                  }}
+                >
+                  <GitCompare size={12} />
+                  <span>A/B Split Markup</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCenterViewMode("viewport")}
+                  style={{
+                    background: centerViewMode === "viewport" ? "#ffffff" : "transparent",
+                    color: centerViewMode === "viewport" ? "#4f46e5" : "var(--text-secondary)",
+                    border: "none",
+                    borderRadius: 6,
+                    padding: "5px 10px",
+                    fontSize: 11,
+                    fontWeight: centerViewMode === "viewport" ? 700 : 500,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    boxShadow: centerViewMode === "viewport" ? "0 1px 3px rgba(0,0,0,0.06)" : "none"
+                  }}
+                >
+                  <Eye size={12} />
+                  <span>Viewport Evidence</span>
+                </button>
+              </div>
+
               {domArtifact && (
                 <a
                   href={`/api/runs/${run.id}/artifacts/${domArtifact.id}`}
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-secondary"
-                  style={{ fontSize: 11, padding: "5px 12px" }}
+                  style={{ fontSize: 11, padding: "5px 10px" }}
                 >
                   <FileCode2 size={12} color="#4f46e5" />
-                  <span>Open DOM Snapshot</span>
+                  <span>DOM</span>
                 </a>
               )}
               {screenshotArtifact && (
-              <a
-                href={`/api/runs/${run.id}/artifacts/${screenshotArtifact.id}`}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-secondary"
-                style={{ fontSize: 11, padding: "5px 12px" }}
-              >
-                <ExternalLink size={12} color="#4f46e5" />
-                <span>Open Fullscreen PNG</span>
-              </a>
+                <a
+                  href={`/api/runs/${run.id}/artifacts/${screenshotArtifact.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary"
+                  style={{ fontSize: 11, padding: "5px 10px" }}
+                >
+                  <ExternalLink size={12} color="#4f46e5" />
+                  <span>PNG</span>
+                </a>
               )}
             </div>
           </div>
 
-          {/* Actual Viewport Image */}
-          {screenshotArtifact ? (
+          {centerViewMode === "split" ? (
+            <VersionSplitView
+              scenarioId={run.mutation_scenario_id}
+              activeStepName={activeStep?.step_name}
+              originalLocator={activeStep?.step_name}
+              healedLocator={healedSelector}
+              screenshotUrl={screenshotArtifact ? `/api/runs/${run.id}/artifacts/${screenshotArtifact.id}` : undefined}
+              runStatus={run.status}
+              onOpenScreenshot={() => setCenterViewMode("viewport")}
+            />
+          ) : screenshotArtifact ? (
             <div className="card-clean" style={{ overflow: "hidden", marginBottom: 20 }}>
               <div style={{
                 background: "#f8fafc",
@@ -438,7 +500,7 @@ export const RunExplorerView: React.FC<Props> = ({
           ) : (
             <div className="card-clean" style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", marginBottom: 20 }}>
               {evidenceEvent?.payload.captureFailed
-                ? (evidenceEvent.payload.captureErrors || []).join("; ") || "Evidence capture failed for this attempt. See Raw Events for details."
+                ? "Evidence capture failed for this attempt. Check the run events for artifact recorder details."
                 : `No screenshot was recorded for ${activeStep?.step_name || "this step"} in this run. Earlier runs do not create retroactive evidence.`}
             </div>
           )}
@@ -453,7 +515,7 @@ export const RunExplorerView: React.FC<Props> = ({
               marginBottom: 16
             }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#e11d48", marginBottom: 6, letterSpacing: "0.05em", fontFamily: "var(--font-mono)" }}>
-              PLAYWRIGHT STEP ERROR
+                PLAYWRIGHT EXCEPTION STACK TRACE
               </div>
               <pre style={{ fontSize: 11, color: "#be123c", whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "var(--font-mono)" }}>
                 {activeStep.error_summary}
@@ -474,6 +536,7 @@ export const RunExplorerView: React.FC<Props> = ({
           <div style={{ display: "flex", gap: 4, background: "#f1f5f9", padding: 3, borderRadius: 8, marginBottom: 16 }}>
             {[
               { id: "diagnostics", label: "Diagnostics" },
+              { id: "split", label: "A/B Diff" },
               { id: "recovery", label: "Recovery Audit" },
               { id: "verifier", label: "Oracle Verifier" },
               { id: "events", label: "Raw Events" }
@@ -670,6 +733,62 @@ export const RunExplorerView: React.FC<Props> = ({
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Tab: A/B Split Markup Quick Panel */}
+          {activeTab === "split" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div className="card-clean" style={{ padding: 14, borderLeft: "4px solid #4f46e5" }}>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 4, fontWeight: 700, letterSpacing: "0.05em" }}>
+                  A/B Comparative Mode
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#4f46e5", marginBottom: 6 }}>
+                  {run.mutation_scenario_id || "Baseline Canonical Workflow"}
+                </div>
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
+                  Detailed side-by-side visual comparison, DOM tree diff, and attribute markup are active in the center viewport.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ marginTop: 12, width: "100%", padding: "7px 12px", fontSize: 11 }}
+                  onClick={() => setCenterViewMode("split")}
+                >
+                  <GitCompare size={12} />
+                  <span>Show Full Split View in Center</span>
+                </button>
+              </div>
+
+              <div className="card-clean" style={{ padding: 14 }}>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 8, fontWeight: 700, letterSpacing: "0.05em" }}>
+                  Active Contract Invariants
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 11 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>Base Contract:</span>
+                    <strong style={{ color: "#2563eb" }}>Version A (v{run.contract_version})</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>Observed Run:</span>
+                    <strong style={{ color: run.status === "HEALED" ? "#059669" : (run.status === "FAILED" ? "#e11d48" : "#d97706") }}>
+                      Version B ({run.status})
+                    </strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>Target Locator:</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-primary)" }}>
+                      {activeStep?.step_name || "Checkout Button"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>Healed Locator:</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#059669", fontWeight: 700 }}>
+                      {healedSelector || "None"}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

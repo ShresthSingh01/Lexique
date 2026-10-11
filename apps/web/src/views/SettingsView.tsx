@@ -16,10 +16,10 @@ export const SettingsView: React.FC = () => {
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 32px" }}>
       <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid var(--border-light)" }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)" }}>
-          Workbench Settings & Policy Configuration
+          Settings
         </h1>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-          Tune IntentLock heuristic thresholds, database verification rules, and healing policies
+          Heuristic thresholds, database verification rules, and service configurations
         </p>
       </div>
 

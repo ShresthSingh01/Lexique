@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 const API_BASE = "http://localhost:3000/api";
 const DEMO_BASE = "http://localhost:3001/api";
 
-describe("IntentLock 100% Real Verification Suite", () => {
+describe("Ojastra 100% Real Verification Suite", () => {
   beforeAll(async () => {
     // Check services are reachable
     const health = await fetch(`${API_BASE}/health`).then(r => r.json());

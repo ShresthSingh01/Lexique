@@ -41,7 +41,7 @@ export const TopHeader: React.FC<Props> = ({
           <Search size={16} color="#64748b" />
           <input
             type="text"
-            placeholder="Search tests, runs, or mutations..."
+            placeholder="Search tests and executions..."
             value={searchQuery}
             onChange={(e) => onSearchQueryChange?.(e.target.value)}
             style={{
@@ -73,7 +73,7 @@ export const TopHeader: React.FC<Props> = ({
             boxShadow: "0 1px 3px rgba(16, 185, 129, 0.12)"
           }}>
             <span className="pulsing-emerald-dot" />
-            ShopMart :3001 & API :3000 Active
+            Services Online
           </div>
 
           {/* Primary Action Button (Electric Indigo) */}
@@ -91,7 +91,7 @@ export const TopHeader: React.FC<Props> = ({
             ) : (
               <>
                 <Play size={14} fill="#ffffff" />
-                <span>Run Demo Test</span>
+                <span>Run Test Suite</span>
               </>
             )}
           </button>

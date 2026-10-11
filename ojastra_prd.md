@@ -1,5 +1,5 @@
 ---
-title: "IntentLock — Product Requirements Document"
+title: "Ojastra — Product Requirements Document"
 subtitle: "Evidence-Gated Self-Healing End-to-End Tests"
 author: "Product & Engineering"
 date: "11 October 2026"
@@ -34,7 +34,7 @@ Document Control
 
 # Document Control
 
-- **Product:** IntentLock
+- **Product:** Ojastra
 - **Document:** Product Requirements Document (PRD)
 - **Version:** 1.0 — Hackathon MVP
 - **Status:** Implementation baseline
@@ -48,7 +48,7 @@ This PRD is the build contract for the hackathon implementation. Requirements ma
 
 # 1. Executive Summary
 
-IntentLock is a self-healing end-to-end testing workbench. It runs known browser workflows deterministically, detects likely interface drift, asks an AI-assisted recovery adapter to propose a constrained replacement action, and verifies the original test outcome independently. It is designed to repair brittle test interactions without silently changing what the test is supposed to prove.
+Ojastra is a self-healing end-to-end testing workbench. It runs known browser workflows deterministically, detects likely interface drift, asks an AI-assisted recovery adapter to propose a constrained replacement action, and verifies the original test outcome independently. It is designed to repair brittle test interactions without silently changing what the test is supposed to prove.
 
 The product is not a general-purpose browser agent and not a chat interface wrapped around Playwright. Its key product behavior is the complete, auditable loop:
 
@@ -61,7 +61,7 @@ The product is not a general-purpose browser agent and not a chat interface wrap
 7. Verify the original contract independently.
 8. Store an explanation and evidence record for the final outcome.
 
-The demo application is a small checkout workflow with controlled Version A and Version B UI variants, a test-only order backend, and a Mutation Lab. Judges can trigger a harmless UI change and observe a successful recovery, then introduce a real business-logic failure and see IntentLock refuse to mark the test as healed.
+The demo application is a small checkout workflow with controlled Version A and Version B UI variants, a test-only order backend, and a Mutation Lab. Judges can trigger a harmless UI change and observe a successful recovery, then introduce a real business-logic failure and see Ojastra refuse to mark the test as healed.
 
 ## Product promise
 
@@ -69,7 +69,7 @@ The demo application is a small checkout workflow with controlled Version A and 
 
 ## What makes this product defensible
 
-The differentiation is not simply using an LLM, natural-language instructions, browser screenshots, or Playwright. General-purpose browser agents and automation frameworks can perform many of those tasks. IntentLock focuses on a specialized test reliability lifecycle: an immutable intent contract, evidence-gated recovery, independent outcome verification, governed repair history, and measurable performance against controlled UI mutations and real seeded regressions.
+The differentiation is not simply using an LLM, natural-language instructions, browser screenshots, or Playwright. General-purpose browser agents and automation frameworks can perform many of those tasks. Ojastra focuses on a specialized test reliability lifecycle: an immutable intent contract, evidence-gated recovery, independent outcome verification, governed repair history, and measurable performance against controlled UI mutations and real seeded regressions.
 
 These capabilities must be implemented and measured; they must not be presented as guaranteed advantages over other products without a fair benchmark.
 
@@ -79,7 +79,7 @@ Traditional end-to-end tests often couple a user workflow to implementation deta
 
 A fully agentic alternative creates a different risk: the agent may click the wrong control, change the workflow, bypass a failing path, or report success without proving the intended business outcome. A recovery system that turns every failure into a pass undermines the purpose of testing.
 
-IntentLock must therefore solve two connected problems:
+Ojastra must therefore solve two connected problems:
 
 - **Adaptability:** recover from supported, harmless interface changes without requiring developers to rewrite every affected step manually.
 - **Correctness:** preserve the original intent and prevent real product defects, invalid state transitions, or ambiguous actions from being concealed by recovery.
@@ -183,7 +183,7 @@ Needs to trigger controlled changes and observe the outcome without reading the 
 
 ## 6.1 First-run journey
 
-1. User opens the IntentLock workbench.
+1. User opens the Ojastra workbench.
 2. Overview shows the demonstration test, last run status, and available mutation scenarios.
 3. User opens the saved “Complete checkout with a valid test card” test and reviews its goal and invariants.
 4. User clicks **Run baseline**.
@@ -504,7 +504,7 @@ Owns the run state machine. It coordinates Playwright execution, classification,
 Owns deterministic navigation, known locators, user actions, assertions, browser timeouts, trace/screenshot creation, and low-level failure normalization.
 
 ### Stagehand adapter
-Owns page observation/candidate discovery for eligible recovery cases. Stagehand response shapes are normalized into IntentLock's internal candidate contract. Core engine code must not depend directly on unverified SDK response fields.
+Owns page observation/candidate discovery for eligible recovery cases. Stagehand response shapes are normalized into Ojastra's internal candidate contract. Core engine code must not depend directly on unverified SDK response fields.
 
 ### LLM adapter
 Builds a sanitized prompt, submits a typed request, validates the structured response, records model/version/latency/token metadata where available, and maps provider errors to a recoverable diagnosis failure. The adapter must be replaceable without changing the engine's domain logic.
@@ -810,7 +810,7 @@ The workbench should feel like a focused engineering tool: restrained neutral ba
 ## 14.2 Overview
 
 Components:
-- Top bar with IntentLock mark, active environment, connection/run status.
+- Top bar with Ojastra mark, active environment, connection/run status.
 - Compact KPI strip: runs in selected window, healed runs, failed runs, measured benign recovery rate. Each metric includes sample count and date/window.
 - Recent runs table: test name, mutation, status, duration, time, and recovery count.
 - Primary action to open Mutation Lab/run a selected test.
@@ -913,7 +913,7 @@ Targets apply only to the documented benchmark set. Report counts with rates; fo
 # 17. Proposed Repository Structure
 
 ```text
-intentlock/
+Ojastra/
   apps/
     web/
       src/

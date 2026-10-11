@@ -21,7 +21,7 @@ export const CONFIG = {
   webPort: parseInt(process.env.WEB_PORT || "5173", 10),
   demoOrigin: process.env.DEMO_APP_ORIGIN || `http://localhost:${process.env.DEMO_PORT || "3001"}`,
   storageDir: path.resolve(process.cwd(), process.env.STORAGE_DIR || "storage"),
-  databasePath: path.resolve(process.cwd(), process.env.DATABASE_PATH || "storage/intentlock.db"),
+  databasePath: path.resolve(process.cwd(), process.env.DATABASE_PATH || "storage/ojastra.db"),
   headless: process.env.HEADLESS !== "false",
   minimumCandidateSimilarity,
 

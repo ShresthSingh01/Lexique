@@ -47,7 +47,7 @@ export class FailureClassifier {
         category: "ASSERTION_OR_BUSINESS_INVARIANT",
         confidence: Math.max(0.95, vectorResult.similarity),
         isRecoverable: false,
-        reason: "Business logic assertion failed on an existing element or verified backend state. IntentLock strictly prohibits healing genuine defects.",
+        reason: "Business logic assertion failed on an existing element or verified backend state. Ojastra strictly prohibits healing genuine defects.",
         suggestedAction: "Investigate application logic regression (e.g. pricing, discount, or payment gateway calculation).",
         evidenceSignals: signals
       };
