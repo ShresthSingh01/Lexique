@@ -162,7 +162,7 @@ app.get("/cart", (req, res) => {
       <div class="custom-dom-restructure-wrapper-outer">
         <div class="summary-action-container-inner" style="display: inline-block;">
           <div class="nested-interactive-slot">
-            <a href="/checkout" role="button" id="checkout-action-restructured" data-testid="checkout-btn" class="btn btn-primary" style="font-size: 16px; padding: 12px 28px;">
+            <a href="/checkout" role="button" id="checkout-action-restructured" data-testid="checkout-nested-btn" class="btn btn-primary" style="font-size: 16px; padding: 12px 28px;">
               Checkout
             </a>
           </div>
@@ -174,7 +174,7 @@ app.get("/cart", (req, res) => {
     checkoutButtonHtml = `
       <div style="background: #1e1b4b; border: 1px dashed #6366f1; border-radius: 8px; padding: 16px; margin-top: 16px; text-align: center;">
         <span style="display: block; font-size: 12px; color: #a5b4fc; margin-bottom: 8px;">⚡ Fast Order Routing Section</span>
-        <a href="/checkout" role="button" id="checkout-relocated" data-testid="checkout-btn" class="btn btn-primary" style="font-size: 16px; padding: 12px 28px;">
+        <a href="/checkout" role="button" id="checkout-relocated" data-testid="checkout-relocated-btn" class="btn btn-primary" style="font-size: 16px; padding: 12px 28px;">
           Checkout
         </a>
       </div>

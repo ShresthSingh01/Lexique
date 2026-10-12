@@ -14,7 +14,9 @@ import {
   Eye,
   Layers,
   Cpu,
-  Monitor
+  Monitor,
+  Camera,
+  Globe
 } from "lucide-react";
 
 export interface LiveEventItem {
@@ -48,6 +50,9 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
   contract
 }) => {
   const [activeTab, setActiveTab] = useState<"progress" | "browser" | "logs">("progress");
+  const [runDetail, setRunDetail] = useState<any>(null);
+  const [selectedStepIndex, setSelectedStepIndex] = useState<number>(0);
+  const [browserMode, setBrowserMode] = useState<"step_viewports" | "storefront">("step_viewports");
 
   const safeEvents = events || [];
   const isTerminal = ["PASSED", "HEALED", "FAILED", "REVIEW_REQUIRED"].includes(status);
@@ -116,6 +121,61 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
   } else if (isTerminal) {
     activePhase = `Execution Complete — Status: ${status}`;
   }
+
+  // Periodically fetch live run details for screenshots and step records
+  useEffect(() => {
+    if (!runId || !isOpen) return;
+    let isSubscribed = true;
+    const loadRunData = async () => {
+      try {
+        const res = await fetch(`/api/runs/${runId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isSubscribed) {
+            setRunDetail(data);
+          }
+        }
+      } catch {}
+    };
+    loadRunData();
+    const interval = setInterval(loadRunData, 1200);
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
+  }, [runId, isOpen, isTerminal]);
+
+  // Steps with actual run execution data
+  const executedSteps = runDetail?.steps || [];
+  const displaySteps = executedSteps.length > 0
+    ? executedSteps.map((s: any, idx: number) => ({
+        id: s.step_id || `step_${idx + 1}`,
+        num: idx + 1,
+        name: s.step_name || `Step ${idx + 1}`,
+        status: s.status,
+        durationMs: s.duration_ms,
+        screenshotId: s.screenshot_artifact_id,
+        domId: s.dom_artifact_id,
+        errorSummary: s.error_summary
+      }))
+    : pipelineSteps.map((s: any, idx: number) => {
+        const passedEvt = safeEvents.find(e => e.type === "STEP_PASSED" && e.payload?.stepId === s.id);
+        const failedEvt = safeEvents.find(e => e.type === "STEP_FAILED" && e.payload?.stepId === s.id);
+        return {
+          id: s.id,
+          num: idx + 1,
+          name: s.name,
+          status: passedEvt ? (passedEvt.payload?.healed ? "HEALED" : "PASSED") : failedEvt ? "FAILED" : "PENDING",
+          durationMs: passedEvt?.payload?.durationMs || failedEvt?.payload?.durationMs,
+          screenshotId: undefined,
+          domId: undefined,
+          errorSummary: failedEvt?.payload?.errorMessage
+        };
+      });
+
+  const activeStepItem = displaySteps[selectedStepIndex] || displaySteps[0];
+  const activeScreenshotId = activeStepItem?.screenshotId;
+  const activeScreenshotUrl = activeScreenshotId && runId ? `/api/runs/${runId}/artifacts/${activeScreenshotId}` : null;
 
   // Hook rules require all hooks to run unconditionally before this check
   if (!isOpen || !runId) return null;
@@ -634,16 +694,18 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
               <div style={{
                 background: "#f8fafc",
                 border: "1px solid var(--border-light)",
-                borderRadius: 8,
+                borderRadius: 10,
                 padding: "12px 16px",
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "center"
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 10
               }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
                     <Monitor size={15} color="#4f46e5" />
-                    <span>Playwright Chromium Desktop Window</span>
+                    <span>Playwright Chromium Live Runner</span>
                     <span style={{
                       fontSize: 10,
                       fontWeight: 700,
@@ -654,64 +716,244 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                     }}>
                       SLOW-MO 350ms • HEADED
                     </span>
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 3 }}>
-                    Look at your desktop window to watch Chromium interact in real-time with glowing outlines (<span style={{ color: "#6366f1", fontWeight: 700 }}>#6366f1 clicks</span>, <span style={{ color: "#10b981", fontWeight: 700 }}>#10b981 inputs</span>).
-                  </div>
-                </div>
-
-                <a
-                  href="http://localhost:3001/checkout"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-secondary"
-                  style={{ fontSize: 11, padding: "5px 12px", textDecoration: "none" }}
-                >
-                  <ExternalLink size={12} />
-                  <span>Open Target Tab</span>
-                </a>
-              </div>
-
-              {/* Embedded In-Workbench Target View Frame */}
-              <div style={{
-                border: "1px solid var(--border-light)",
-                borderRadius: 10,
-                overflow: "hidden",
-                background: "#ffffff",
-                boxShadow: "var(--shadow-sm)"
-              }}>
-                <div style={{
-                  background: "#f1f5f9",
-                  padding: "8px 14px",
-                  borderBottom: "1px solid var(--border-light)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between"
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} />
-                    <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "#64748b", marginLeft: 8 }}>
-                      http://localhost:3001/checkout
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 9999,
+                      background: "#ecfdf5",
+                      color: "#059669"
+                    }}>
+                      GENUINE CHROMIUM
                     </span>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#059669", background: "#ecfdf5", padding: "1px 6px", borderRadius: 4 }}>
-                    PORT 3001 LIVE
-                  </span>
+                  <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 3 }}>
+                    Chromium browser executes on your desktop with visual outlines (<span style={{ color: "#6366f1", fontWeight: 700 }}>#6366f1 clicks</span>, <span style={{ color: "#10b981", fontWeight: 700 }}>#10b981 inputs</span>). Step viewports captured below:
+                  </div>
                 </div>
 
-                <iframe
-                  src="http://localhost:3001/checkout"
-                  title="Target Storefront Preview"
-                  style={{
-                    width: "100%",
-                    height: "340px",
-                    border: "none",
-                    display: "block"
-                  }}
-                />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", background: "#e2e8f0", padding: 2, borderRadius: 6 }}>
+                    <button
+                      onClick={() => setBrowserMode("step_viewports")}
+                      style={{
+                        background: browserMode === "step_viewports" ? "#ffffff" : "transparent",
+                        color: browserMode === "step_viewports" ? "#0f172a" : "#64748b",
+                        border: "none",
+                        padding: "4px 10px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4
+                      }}
+                    >
+                      <Camera size={12} />
+                      <span>Step Viewports ({displaySteps.filter((s: any) => s.status === "PASSED" || s.status === "HEALED").length}/{displaySteps.length})</span>
+                    </button>
+                    <button
+                      onClick={() => setBrowserMode("storefront")}
+                      style={{
+                        background: browserMode === "storefront" ? "#ffffff" : "transparent",
+                        color: browserMode === "storefront" ? "#0f172a" : "#64748b",
+                        border: "none",
+                        padding: "4px 10px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4
+                      }}
+                    >
+                      <Globe size={12} />
+                      <span>Live Catalog (Port 3001)</span>
+                    </button>
+                  </div>
+
+                  <a
+                    href="http://localhost:3001"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-secondary"
+                    style={{ fontSize: 11, padding: "5px 12px", textDecoration: "none" }}
+                  >
+                    <ExternalLink size={12} />
+                    <span>Open Storefront</span>
+                  </a>
+                </div>
               </div>
+
+              {/* View Mode: Step Viewports */}
+              {browserMode === "step_viewports" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {/* Step Selector Pills */}
+                  <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+                    {displaySteps.map((step: any, idx: number) => {
+                      const isSelected = selectedStepIndex === idx;
+                      const isStepPassed = step.status === "PASSED" || step.status === "HEALED";
+                      const isStepFailed = step.status === "FAILED";
+                      return (
+                        <button
+                          key={step.id || idx}
+                          onClick={() => setSelectedStepIndex(idx)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "6px 12px",
+                            borderRadius: 8,
+                            fontSize: 12,
+                            fontWeight: isSelected ? 700 : 500,
+                            background: isSelected ? "#3b82f6" : "#f1f5f9",
+                            color: isSelected ? "#ffffff" : "#475569",
+                            border: isSelected ? "1px solid #2563eb" : "1px solid var(--border-light)",
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                            transition: "all 0.15s ease"
+                          }}
+                        >
+                          <span style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            background: isSelected ? "rgba(255,255,255,0.25)" : isStepPassed ? "#10b981" : isStepFailed ? "#ef4444" : "#94a3b8",
+                            color: "#ffffff",
+                            fontSize: 10,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 700
+                          }}>
+                            {isStepPassed ? "✓" : isStepFailed ? "✗" : idx + 1}
+                          </span>
+                          <span>{step.name}</span>
+                          {step.durationMs ? (
+                            <span style={{ fontSize: 10, opacity: 0.85 }}>
+                              {step.durationMs}ms
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Viewport Card */}
+                  <div style={{
+                    border: "1px solid var(--border-light)",
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    background: "#0f172a",
+                    boxShadow: "var(--shadow-sm)"
+                  }}>
+                    <div style={{
+                      background: "#1e293b",
+                      padding: "8px 14px",
+                      borderBottom: "1px solid #334155",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} />
+                        <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "#94a3b8", marginLeft: 8 }}>
+                          Step {selectedStepIndex + 1}: {activeStepItem?.name || "Viewport"}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {activeStepItem?.durationMs ? (
+                          <span style={{ fontSize: 10, color: "#94a3b8" }}>
+                            Executed in {activeStepItem.durationMs}ms
+                          </span>
+                        ) : null}
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: activeStepItem?.status === "PASSED" || activeStepItem?.status === "HEALED" ? "#10b981" : activeStepItem?.status === "FAILED" ? "#ef4444" : "#94a3b8",
+                          background: "rgba(255,255,255,0.08)",
+                          padding: "1px 8px",
+                          borderRadius: 4
+                        }}>
+                          {activeStepItem?.status || "RUNNING"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ position: "relative", minHeight: 320, maxHeight: 380, display: "flex", alignItems: "center", justifyContent: "center", background: "#0b1120" }}>
+                      {activeScreenshotUrl ? (
+                        <img
+                          src={activeScreenshotUrl}
+                          alt={`Step ${selectedStepIndex + 1} screenshot`}
+                          style={{
+                            width: "100%",
+                            maxHeight: 380,
+                            objectFit: "contain",
+                            display: "block"
+                          }}
+                        />
+                      ) : (
+                        <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>
+                          <Cpu size={28} className="pulsing-dot" style={{ margin: "0 auto 12px auto", display: "block", color: "#6366f1" }} />
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#f8fafc" }}>
+                            {activeStepItem?.status === "FAILED" ? "Step Failed" : "Playwright Chromium Runner Active"}
+                          </div>
+                          <div style={{ fontSize: 12, marginTop: 4, maxWidth: 460 }}>
+                            {activeStepItem?.errorSummary || "Chromium is executing this step on your desktop. Full viewport screenshot will appear here as soon as this step completes."}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* View Mode: Live Storefront Catalog */}
+              {browserMode === "storefront" && (
+                <div style={{
+                  border: "1px solid var(--border-light)",
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  background: "#ffffff",
+                  boxShadow: "var(--shadow-sm)"
+                }}>
+                  <div style={{
+                    background: "#f1f5f9",
+                    padding: "8px 14px",
+                    borderBottom: "1px solid var(--border-light)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} />
+                      <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "#64748b", marginLeft: 8 }}>
+                        http://localhost:3001
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#059669", background: "#ecfdf5", padding: "1px 6px", borderRadius: 4 }}>
+                      PORT 3001 LIVE CATALOG
+                    </span>
+                  </div>
+
+                  <iframe
+                    src="http://localhost:3001"
+                    title="Target Storefront Preview"
+                    style={{
+                      width: "100%",
+                      height: "340px",
+                      border: "none",
+                      display: "block"
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

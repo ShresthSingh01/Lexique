@@ -101,12 +101,16 @@ export const RunExplorerView: React.FC<Props> = ({
   // Recovery attempt for this step
   const recoveryAttempt = recoveryAttempts.find(r => r.step_id === activeStep?.step_id);
   const reviewCandidates = recoveryAttempt?.candidateSet || [];
-  const selectedReviewCandidateId = reviewCandidateId ||
+  const defaultCandidateId =
     recoveryAttempt?.proposal?.targetCandidateId ||
+    reviewCandidates.find((c: any) => c.isVisible && c.isEnabled)?.candidateId ||
     reviewCandidates[0]?.candidateId ||
     "";
+  const selectedReviewCandidateId = reviewCandidateId || defaultCandidateId;
   const humanReviews = runDetail.humanReviews || [];
-  const approvedRetryExists = humanReviews.some(review => review.decision === "APPROVE_RETRY");
+  const approvedRetry = humanReviews.find(review => review.decision === "APPROVE_RETRY");
+  const approvedRetryExists = Boolean(approvedRetry);
+  const approvedCandidateObj = reviewCandidates.find((c: any) => c.candidateId === approvedRetry?.candidate_id);
 
   // Find chosen candidate and healed selector
   const chosenCandidate = recoveryAttempt?.candidateSet?.find(
@@ -602,113 +606,182 @@ export const RunExplorerView: React.FC<Props> = ({
           {activeTab === "diagnostics" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {run.status === "REVIEW_REQUIRED" && (
-                <div className="card-clean" style={{ padding: 14, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, color: "#92400e", fontWeight: 800, marginBottom: 6 }}>
-                    <UserRoundCheck size={16} />
-                    Human review required
-                  </div>
-                  <p style={{ fontSize: 12, color: "#78350f", lineHeight: 1.5, marginBottom: 10 }}>
-                    Automation stopped safely because no candidate met policy or the observed target was ambiguous. Review the captured candidate evidence below. Approval queues a linked retry; it does not mark this run healed or bypass fresh candidate checks and the original contract verifier.
-                  </p>
-                  {reviewCandidates.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
-                      {reviewCandidates.map((candidate: any) => (
-                        <label key={candidate.candidateId} style={{
-                          display: "grid",
-                          gridTemplateColumns: "18px 1fr",
-                          gap: 8,
-                          alignItems: "start",
-                          padding: 8,
-                          background: "#fff",
-                          border: `1px solid ${selectedReviewCandidateId === candidate.candidateId ? "#f59e0b" : "#e5e7eb"}`,
-                          borderRadius: 6,
-                          cursor: "pointer"
-                        }}>
-                          <input
-                            type="radio"
-                            name={`review-candidate-${run.id}`}
-                            value={candidate.candidateId}
-                            checked={selectedReviewCandidateId === candidate.candidateId}
-                            onChange={() => setReviewCandidateId(candidate.candidateId)}
-                            style={{ marginTop: 2, accentColor: "#d97706" }}
-                          />
-                          <span>
-                            <strong style={{ fontSize: 12, color: "#111827" }}>{candidate.name || candidate.role || candidate.candidateId}</strong>
-                            <span style={{ display: "block", fontSize: 10, color: "#475569", marginTop: 2 }}>
-                              {candidate.candidateId} · {candidate.role || "unknown role"} · {candidate.isVisible ? "visible" : "hidden"} · {candidate.isEnabled ? "enabled" : "disabled"} · {candidate.isUnique ? "unique" : "ambiguous"}
-                            </span>
-                            {candidateSimilarityById.has(candidate.candidateId) && (
-                              <span style={{ display: "block", fontSize: 10, color: "#92400e", marginTop: 2 }}>
-                                Semantic similarity: {candidateSimilarityById.get(candidate.candidateId)?.toFixed(4)} · automatic threshold: {candidateEvidence?.payload.minimumSimilarity?.toFixed(2)}
-                              </span>
-                            )}
-                            {candidate.selector && (
-                              <code style={{ display: "block", fontSize: 10, color: "#64748b", marginTop: 3, overflowWrap: "anywhere" }}>
-                                {candidate.selector}
-                              </code>
-                            )}
-                          </span>
-                        </label>
-                      ))}
+                approvedRetryExists ? (
+                  <div className="card-clean" style={{ padding: 16, borderLeft: "4px solid #10b981", background: "#f0fdf4" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#065f46", fontWeight: 800, fontSize: 13 }}>
+                        <CheckCircle2 size={18} color="#059669" />
+                        Human Review Approved & Executed
+                      </div>
+                      <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", background: "#d1fae5", color: "#065f46", padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>
+                        DECISION RECORDED
+                      </span>
                     </div>
-                  ) : (
-                    <p style={{ fontSize: 12, color: "#78350f", marginBottom: 10 }}>
-                      No recovery candidates were captured for this run. You can reject the proposal or record what needs clarification; an approval retry is unavailable.
+                    <p style={{ fontSize: 12, color: "#047857", lineHeight: 1.5, marginBottom: 12 }}>
+                      A reviewer approved candidate <strong>{approvedCandidateObj?.name || approvedRetry?.candidate_id || "target element"}</strong>. A linked retry run was executed and evaluated with fresh candidate checks and the oracle verifier.
                     </p>
-                  )}
-                  <textarea
-                    value={reviewNote}
-                    onChange={event => setReviewNote(event.target.value)}
-                    placeholder="Optional review note; required for clarification"
-                    rows={2}
-                    maxLength={2000}
-                    style={{ width: "100%", resize: "vertical", padding: 8, border: "1px solid #fcd34d", borderRadius: 6, font: "inherit", fontSize: 12, marginBottom: 8 }}
-                  />
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    <button
-                      className="btn btn-primary"
-                      disabled={reviewSubmitting || approvedRetryExists || reviewCandidates.length === 0 || !reviewCandidates.some((candidate: any) => candidate.candidateId === selectedReviewCandidateId && candidate.isVisible && candidate.isEnabled && candidate.isUnique)}
-                      onClick={() => handleHumanReview("approve_retry")}
-                      style={{ padding: "6px 9px", fontSize: 11 }}
-                    >
-                      <UserRoundCheck size={13} />
-                      Approve safe retry
-                    </button>
-                    <button className="btn btn-secondary" disabled={reviewSubmitting || approvedRetryExists} onClick={() => handleHumanReview("reject")} style={{ padding: "6px 9px", fontSize: 11 }}>
-                      <XCircle size={13} />
-                      Reject
-                    </button>
-                    <button className="btn btn-secondary" disabled={reviewSubmitting || approvedRetryExists} onClick={() => handleHumanReview("clarification")} style={{ padding: "6px 9px", fontSize: 11 }}>
-                      <MessageSquareText size={13} />
-                      Request clarification
-                    </button>
-                  </div>
-                  {approvedRetryExists && (
-                    <p style={{ fontSize: 11, color: "#92400e", marginTop: 8 }}>
-                      A retry was already approved for this run. Review decision history remains available below.
-                    </p>
-                  )}
-                  {reviewMessage && <p role="status" style={{ fontSize: 11, color: "#78350f", marginTop: 8 }}>{reviewMessage}</p>}
-                  {humanReviews.length > 0 && (
-                    <div style={{ borderTop: "1px solid #fde68a", marginTop: 10, paddingTop: 8 }}>
-                      <strong style={{ fontSize: 11, color: "#78350f" }}>Review history</strong>
-                      {humanReviews.map(review => (
-                        <div key={review.id} style={{ fontSize: 10, color: "#78350f", marginTop: 5 }}>
-                          {review.decision.replaceAll("_", " ")} · {new Date(review.created_at).toLocaleString()}
-                          {review.note ? ` — ${review.note}` : ""}
-                          {review.child_run_id && (
-                            <button
-                              onClick={() => onOpenRun?.(review.child_run_id!)}
-                              style={{ display: "block", border: 0, padding: 0, background: "none", color: "#4f46e5", cursor: "pointer", font: "inherit", textDecoration: "underline" }}
-                            >
-                              Open retry run {review.child_run_id}
-                            </button>
-                          )}
+
+                    {approvedRetry?.child_run_id && (
+                      <div style={{ background: "#ffffff", border: "1px solid #a7f3d0", borderRadius: 8, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, boxShadow: "0 1px 3px rgba(16, 185, 129, 0.1)" }}>
+                        <div>
+                          <div style={{ fontSize: 10, color: "#065f46", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em" }}>Linked Retry Run</div>
+                          <div style={{ fontSize: 13, fontFamily: "var(--font-mono)", fontWeight: 800, color: "#0f172a", marginTop: 2 }}>{approvedRetry.child_run_id}</div>
                         </div>
-                      ))}
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => onOpenRun?.(approvedRetry.child_run_id!)}
+                          style={{ padding: "7px 16px", fontSize: 12, fontWeight: 700 }}
+                        >
+                          <span>Open Retry Run ↗</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {approvedCandidateObj && (
+                      <div style={{ fontSize: 11, color: "#065f46", background: "#ecfdf5", padding: "8px 10px", borderRadius: 6, border: "1px solid #bbf7d0", marginBottom: 10 }}>
+                        <strong>Selected Element:</strong> {approvedCandidateObj.name} ({approvedCandidateObj.role})
+                        {approvedCandidateObj.selector && <code style={{ display: "block", marginTop: 3, color: "#047857" }}>{approvedCandidateObj.selector}</code>}
+                      </div>
+                    )}
+
+                    {humanReviews.length > 0 && (
+                      <div style={{ borderTop: "1px solid #bbf7d0", paddingTop: 8 }}>
+                        <strong style={{ fontSize: 11, color: "#065f46" }}>Audit History</strong>
+                        {humanReviews.map(review => (
+                          <div key={review.id} style={{ fontSize: 10, color: "#047857", marginTop: 4 }}>
+                            {review.decision.replaceAll("_", " ")} · {new Date(review.created_at).toLocaleString()}
+                            {review.note ? ` — "${review.note}"` : ""}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="card-clean" style={{ padding: 16, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, color: "#92400e", fontWeight: 800, marginBottom: 6 }}>
+                      <UserRoundCheck size={16} />
+                      Human review required
                     </div>
-                  )}
-                </div>
+                    <p style={{ fontSize: 12, color: "#78350f", lineHeight: 1.5, marginBottom: 12 }}>
+                      Automation stopped safely because no candidate met the automatic threshold ({candidateEvidence?.payload.minimumSimilarity?.toFixed(2) || "0.85"}) or the observed target was ambiguous. Review the candidates below and click one to approve a safe retry.
+                    </p>
+
+                    {reviewCandidates.length > 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, maxHeight: 280, overflowY: "auto", paddingRight: 4 }}>
+                        {reviewCandidates.map((candidate: any) => {
+                          const isSelected = selectedReviewCandidateId === candidate.candidateId;
+                          const similarity = candidateSimilarityById.get(candidate.candidateId);
+                          return (
+                            <div
+                              key={candidate.candidateId}
+                              onClick={() => setReviewCandidateId(candidate.candidateId)}
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "20px 1fr",
+                                gap: 10,
+                                alignItems: "start",
+                                padding: "10px 12px",
+                                background: isSelected ? "#fffdf5" : "#ffffff",
+                                border: isSelected ? "2px solid #d97706" : "1px solid #e5e7eb",
+                                borderRadius: 8,
+                                cursor: "pointer",
+                                boxShadow: isSelected ? "0 2px 6px rgba(217, 119, 6, 0.15)" : "none",
+                                transition: "all 0.12s ease"
+                              }}
+                            >
+                              <input
+                                type="radio"
+                                name={`review-candidate-${run.id}`}
+                                value={candidate.candidateId}
+                                checked={isSelected}
+                                onChange={() => setReviewCandidateId(candidate.candidateId)}
+                                style={{ marginTop: 3, accentColor: "#d97706" }}
+                              />
+                              <div>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <strong style={{ fontSize: 12, color: isSelected ? "#92400e" : "#111827" }}>
+                                    {candidate.name || candidate.role || candidate.candidateId}
+                                  </strong>
+                                  {isSelected && (
+                                    <span style={{ fontSize: 9, fontWeight: 800, color: "#92400e", background: "#fef3c7", padding: "1px 6px", borderRadius: 4 }}>
+                                      SELECTED
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>
+                                  {candidate.candidateId} · {candidate.role || "unknown role"} · {candidate.isVisible ? "visible" : "hidden"} · {candidate.isEnabled ? "enabled" : "disabled"} · {candidate.isUnique ? "unique" : "ambiguous"}
+                                </div>
+                                {similarity !== undefined && (
+                                  <div style={{ fontSize: 10, color: "#92400e", marginTop: 2 }}>
+                                    Semantic similarity: {similarity.toFixed(4)} · automatic threshold: {candidateEvidence?.payload.minimumSimilarity?.toFixed(2) || "0.85"}
+                                  </div>
+                                )}
+                                {candidate.selector && (
+                                  <code style={{ display: "block", fontSize: 10, color: "#64748b", marginTop: 3, overflowWrap: "anywhere" }}>
+                                    {candidate.selector}
+                                  </code>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: 12, color: "#78350f", marginBottom: 10 }}>
+                        No recovery candidates were captured for this run.
+                      </p>
+                    )}
+
+                    <textarea
+                      value={reviewNote}
+                      onChange={event => setReviewNote(event.target.value)}
+                      placeholder="Optional review note (required if requesting clarification)"
+                      rows={2}
+                      maxLength={2000}
+                      style={{ width: "100%", resize: "vertical", padding: 8, border: "1px solid #fcd34d", borderRadius: 6, font: "inherit", fontSize: 12, marginBottom: 10, background: "#fff" }}
+                    />
+
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={reviewSubmitting || !selectedReviewCandidateId}
+                        onClick={() => handleHumanReview("approve_retry")}
+                        style={{ padding: "8px 14px", fontSize: 12, fontWeight: 700 }}
+                      >
+                        <UserRoundCheck size={14} />
+                        {reviewSubmitting ? "Submitting..." : `Approve Retry with ${selectedReviewCandidateId || "Selected Candidate"}`}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        disabled={reviewSubmitting}
+                        onClick={() => handleHumanReview("reject")}
+                        style={{ padding: "8px 14px", fontSize: 12 }}
+                      >
+                        <XCircle size={14} />
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        disabled={reviewSubmitting}
+                        onClick={() => handleHumanReview("clarification")}
+                        style={{ padding: "8px 14px", fontSize: 12 }}
+                      >
+                        <MessageSquareText size={14} />
+                        Request clarification
+                      </button>
+                    </div>
+
+                    {reviewMessage && (
+                      <p role="status" style={{ fontSize: 12, color: "#92400e", marginTop: 10, fontWeight: 600 }}>
+                        {reviewMessage}
+                      </p>
+                    )}
+                  </div>
+                )
               )}
               {failureEvent ? (
                 <>

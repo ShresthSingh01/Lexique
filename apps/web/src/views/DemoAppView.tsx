@@ -3,7 +3,7 @@ import { ExternalLink, RotateCw, ShoppingCart, Store, Database, ArrowRight } fro
 
 export const DemoAppView: React.FC = () => {
   const [iframeKey, setIframeKey] = useState(0);
-  const [activeUrl, setActiveUrl] = useState("http://localhost:3001/checkout");
+  const [activeUrl, setActiveUrl] = useState("http://localhost:3001");
 
   const handleRefresh = () => {
     setIframeKey(k => k + 1);

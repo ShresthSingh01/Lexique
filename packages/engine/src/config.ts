@@ -2,18 +2,26 @@ import path from "node:path";
 import fs from "node:fs";
 import dotenv from "dotenv";
 
-// Robustly locate .env by walking up directories from process.cwd() or module location
+// Robustly locate workspace root (pnpm-workspace.yaml) and .env
 function findEnvAndRoot(): { envPath: string | null; rootDir: string } {
   let curr = process.cwd();
+  // 1. Prioritize monorepo root via pnpm-workspace.yaml
   for (let i = 0; i < 6; i++) {
-    const candidate = path.join(curr, ".env");
-    if (fs.existsSync(candidate)) {
-      return { envPath: candidate, rootDir: curr };
-    }
     const wsCandidate = path.join(curr, "pnpm-workspace.yaml");
     if (fs.existsSync(wsCandidate)) {
       const rootEnv = path.join(curr, ".env");
       return { envPath: fs.existsSync(rootEnv) ? rootEnv : null, rootDir: curr };
+    }
+    const parent = path.dirname(curr);
+    if (parent === curr) break;
+    curr = parent;
+  }
+  // 2. Fallback to searching for nearest .env
+  curr = process.cwd();
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(curr, ".env");
+    if (fs.existsSync(candidate)) {
+      return { envPath: candidate, rootDir: curr };
     }
     const parent = path.dirname(curr);
     if (parent === curr) break;

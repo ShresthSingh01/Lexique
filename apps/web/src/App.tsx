@@ -166,6 +166,13 @@ export const App: React.FC = () => {
       }
     }).catch(console.error);
 
+    // If running baseline (no mutation specified), ensure store fixtures are cleanly reset
+    if (!mutationScenarioId) {
+      try {
+        await fetch("/api/fixtures/reset", { method: "POST" });
+      } catch {}
+    }
+
     try {
       const { runId } = await createRun(targetTestId, mutationScenarioId);
       setSelectedRunId(runId);
@@ -398,6 +405,8 @@ export const App: React.FC = () => {
               }}
               onOpenRun={(runId) => {
                 setSelectedRunId(runId);
+                loadRunDetail(runId);
+                loadData();
                 setActiveTab("runs");
               }}
               onRunBaseline={() => handleRunTest(activeTestId)}

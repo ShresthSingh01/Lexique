@@ -20,7 +20,7 @@ export async function fetchSettings(): Promise<SystemSettings> {
   return res.json();
 }
 
-export async function updateSettings(settings: { headless?: boolean }): Promise<SystemSettings> {
+export async function updateSettings(settings: { headless?: boolean; minimumCandidateSimilarity?: number }): Promise<SystemSettings> {
   const res = await fetch(`${BASE}/settings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

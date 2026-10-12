@@ -12,10 +12,14 @@
     "dev:web": "pnpm --filter @intentlock/web dev",
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
-    "test:e2e": "vitest run tests/e2e/workbench.test.ts"
+    "test:e2e": "vitest run tests/e2e/workbench.test.ts",
+    "test:judge": "tsx scripts/judge-terminal-suite.ts",
+    "test:judge:demo": "tsx scripts/judge-terminal-suite.ts --demo",
+    "test:judge:step": "tsx scripts/judge-terminal-suite.ts --interactive"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
+    "playwright": "^1.49.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"

@@ -67,20 +67,70 @@ export const SettingsView: React.FC = () => {
               <input type="checkbox" defaultChecked style={{ width: 18, height: 18, accentColor: "#2563eb" }} />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-                  Candidate auto-acceptance threshold
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px", background: "var(--bg-secondary)", borderRadius: 8, border: "1px solid var(--border-light)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                    Candidate auto-acceptance threshold
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                    Candidates below this semantic similarity require human approval before a retry
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-                  Candidates below this semantic similarity require human approval before a retry
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: "#2563eb", background: "#eff6ff", padding: "3px 10px", borderRadius: 6, border: "1px solid #bfdbfe" }}>
+                  {minimumSimilarity === null
+                    ? settingsError || "Loading policy…"
+                    : `${minimumSimilarity.toFixed(2)}`}
+                </span>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <input
+                  type="range"
+                  min="0.40"
+                  max="0.95"
+                  step="0.05"
+                  value={minimumSimilarity ?? 0.85}
+                  onChange={async (e) => {
+                    const val = parseFloat(e.target.value);
+                    setMinimumSimilarity(val);
+                    try {
+                      await updateSettings({ minimumCandidateSimilarity: val });
+                      setSavedSuccess(true);
+                      setTimeout(() => setSavedSuccess(false), 2000);
+                    } catch (err: any) {
+                      setSettingsError(err.message);
+                    }
+                  }}
+                  style={{ flex: 1, accentColor: "#2563eb", cursor: "pointer" }}
+                />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: 11, padding: "3px 8px", background: minimumSimilarity === 0.85 ? "#dbeafe" : undefined, borderColor: minimumSimilarity === 0.85 ? "#3b82f6" : undefined }}
+                    onClick={async () => {
+                      setMinimumSimilarity(0.85);
+                      await updateSettings({ minimumCandidateSimilarity: 0.85 });
+                      setSavedSuccess(true);
+                      setTimeout(() => setSavedSuccess(false), 2000);
+                    }}
+                  >
+                    0.85 (Strict / Human Review)
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: 11, padding: "3px 8px", background: minimumSimilarity === 0.60 ? "#dbeafe" : undefined, borderColor: minimumSimilarity === 0.60 ? "#3b82f6" : undefined }}
+                    onClick={async () => {
+                      setMinimumSimilarity(0.60);
+                      await updateSettings({ minimumCandidateSimilarity: 0.60 });
+                      setSavedSuccess(true);
+                      setTimeout(() => setSavedSuccess(false), 2000);
+                    }}
+                  >
+                    0.60 (Autonomous Healing)
+                  </button>
                 </div>
               </div>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "#2563eb" }}>
-                {minimumSimilarity === null
-                  ? settingsError || "Loading policy…"
-                  : `${minimumSimilarity.toFixed(2)} (server policy)`}
-              </span>
             </div>
           </div>
         </div>

@@ -75,6 +75,9 @@ server.post("/api/settings", async (request) => {
   if (typeof body.headless === "boolean") {
     CONFIG.headless = body.headless;
   }
+  if (typeof body.minimumCandidateSimilarity === "number" && !isNaN(body.minimumCandidateSimilarity)) {
+    CONFIG.minimumCandidateSimilarity = body.minimumCandidateSimilarity;
+  }
   return {
     minimumCandidateSimilarity: CONFIG.minimumCandidateSimilarity,
     headless: CONFIG.headless,
@@ -664,8 +667,8 @@ server.post("/api/runs/:runId/review", async (request, reply) => {
     if (!selectedCandidate) {
       return reply.status(400).send({ code: "CANDIDATE_NOT_OBSERVED", message: "The selected candidate was not observed for this run." });
     }
-    if (!selectedCandidate.isVisible || !selectedCandidate.isEnabled || !selectedCandidate.isUnique) {
-      return reply.status(400).send({ code: "CANDIDATE_NOT_SAFE", message: "Only visible, enabled, unique observed candidates can be approved for a retry." });
+    if (!selectedCandidate.isVisible || !selectedCandidate.isEnabled) {
+      return reply.status(400).send({ code: "CANDIDATE_NOT_SAFE", message: "Only visible and enabled observed candidates can be approved for a retry." });
     }
     approvedStepId = attempt.step_id;
   }
