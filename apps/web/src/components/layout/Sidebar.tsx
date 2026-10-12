@@ -6,21 +6,24 @@ import {
   FlaskConical,
   Store,
   Settings,
-  Cpu
+  Cpu,
+  Globe
 } from "lucide-react";
 import { OjastraLogo } from "../shared/OjastraLogo.js";
 
-export type TabId = "overview" | "tests" | "runs" | "mutation-lab" | "demo-app" | "settings";
+export type TabId = "overview" | "workbench" | "tests" | "runs" | "mutation-lab" | "demo-app" | "settings";
 
 interface Props {
   activeTab: TabId;
   onSelectTab: (tab: TabId) => void;
   isRunning?: boolean;
+  isHeaded?: boolean;
 }
 
-export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning }) => {
+export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning, isHeaded = true }) => {
   const navItems: { id: TabId; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: "overview", label: "Overview", icon: <LayoutDashboard size={18} /> },
+    { id: "workbench", label: "Any-Site Workbench", icon: <Globe size={18} />, badge: "LIVE" },
     { id: "tests", label: "Tests", icon: <FileCode2 size={18} /> },
     { id: "runs", label: "Runs", icon: <PlayCircle size={18} />, badge: isRunning ? "LIVE" : undefined },
     { id: "mutation-lab", label: "Mutation Lab", icon: <FlaskConical size={18} /> },
@@ -100,15 +103,15 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning }) 
                 width: "100%",
                 padding: "9px 12px",
                 borderRadius: 9,
-                background: isActive ? "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)" : "transparent",
-                color: isActive ? "#4338ca" : "var(--text-secondary)",
-                border: isActive ? "1px solid rgba(199, 210, 254, 0.9)" : "1px solid transparent",
+                background: isActive ? "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)" : "transparent",
+                color: isActive ? "#1d4ed8" : "var(--text-secondary)",
+                border: isActive ? "1px solid rgba(191, 219, 254, 0.9)" : "1px solid transparent",
                 cursor: "pointer",
                 fontSize: 13,
                 fontWeight: isActive ? 700 : 500,
                 transition: "all 0.14s cubic-bezier(0.16, 1, 0.3, 1)",
                 textAlign: "left",
-                boxShadow: isActive ? "0 1px 3px rgba(79, 70, 229, 0.08)" : "none"
+                boxShadow: isActive ? "0 1px 3px rgba(59, 82, 246, 0.1)" : "none"
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
@@ -127,7 +130,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning }) 
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{
-                  color: isActive ? "#4f46e5" : "#64748b",
+                  color: isActive ? "#2563eb" : "#64748b",
                   display: "flex",
                   alignItems: "center"
                 }}>
@@ -206,11 +209,17 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onSelectTab, isRunning }) 
             <div style={{
               fontSize: 10,
               fontWeight: 500,
-              color: "var(--text-tertiary)",
+              color: isHeaded ? "#4f46e5" : "var(--text-tertiary)",
               fontFamily: "var(--font-mono)",
-              marginTop: 1
+              marginTop: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 4
             }}>
-              Local :3000 • Headless
+              <span>Local :3000 •</span>
+              <span style={{ fontWeight: 700, color: isHeaded ? "#4338ca" : "var(--text-secondary)" }}>
+                {isHeaded ? "Live Chromium" : "Headless"}
+              </span>
             </div>
           </div>
         </div>

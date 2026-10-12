@@ -2,9 +2,28 @@ import path from "node:path";
 import fs from "node:fs";
 import dotenv from "dotenv";
 
-// Load .env from project root or current dir
-const envPath = path.resolve(process.cwd(), ".env");
-if (fs.existsSync(envPath)) {
+// Robustly locate .env by walking up directories from process.cwd() or module location
+function findEnvAndRoot(): { envPath: string | null; rootDir: string } {
+  let curr = process.cwd();
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(curr, ".env");
+    if (fs.existsSync(candidate)) {
+      return { envPath: candidate, rootDir: curr };
+    }
+    const wsCandidate = path.join(curr, "pnpm-workspace.yaml");
+    if (fs.existsSync(wsCandidate)) {
+      const rootEnv = path.join(curr, ".env");
+      return { envPath: fs.existsSync(rootEnv) ? rootEnv : null, rootDir: curr };
+    }
+    const parent = path.dirname(curr);
+    if (parent === curr) break;
+    curr = parent;
+  }
+  return { envPath: null, rootDir: process.cwd() };
+}
+
+const { envPath, rootDir: projectRoot } = findEnvAndRoot();
+if (envPath) {
   dotenv.config({ path: envPath });
 } else {
   dotenv.config();
@@ -20,8 +39,8 @@ export const CONFIG = {
   demoPort: parseInt(process.env.DEMO_PORT || "3001", 10),
   webPort: parseInt(process.env.WEB_PORT || "5173", 10),
   demoOrigin: process.env.DEMO_APP_ORIGIN || `http://localhost:${process.env.DEMO_PORT || "3001"}`,
-  storageDir: path.resolve(process.cwd(), process.env.STORAGE_DIR || "storage"),
-  databasePath: path.resolve(process.cwd(), process.env.DATABASE_PATH || "storage/ojastra.db"),
+  storageDir: path.resolve(projectRoot, process.env.STORAGE_DIR || "storage"),
+  databasePath: path.resolve(projectRoot, process.env.DATABASE_PATH || "storage/ojastra.db"),
   headless: process.env.HEADLESS !== "false",
   minimumCandidateSimilarity,
 

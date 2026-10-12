@@ -7,9 +7,26 @@ export async function fetchHealth(): Promise<{ status: string; version: string }
   return res.json();
 }
 
-export async function fetchSettings(): Promise<{ minimumCandidateSimilarity: number }> {
+export interface SystemSettings {
+  minimumCandidateSimilarity: number;
+  headless: boolean;
+  llmProvider?: string;
+  llmModel?: string;
+}
+
+export async function fetchSettings(): Promise<SystemSettings> {
   const res = await fetch(`${BASE}/settings`);
   if (!res.ok) throw new Error(`Unable to load policy settings (HTTP ${res.status}).`);
+  return res.json();
+}
+
+export async function updateSettings(settings: { headless?: boolean }): Promise<SystemSettings> {
+  const res = await fetch(`${BASE}/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings)
+  });
+  if (!res.ok) throw new Error(`Unable to update settings (HTTP ${res.status}).`);
   return res.json();
 }
 
@@ -81,6 +98,59 @@ export async function pingUrl(url: string): Promise<{ reachable: boolean; status
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url })
   });
+  return res.json();
+}
+
+export interface ScannedElement {
+  candidateId: string;
+  role: string;
+  name: string;
+  text: string;
+  tag: string;
+  selector: string;
+  actionType: string;
+  isVisible: boolean;
+  isEnabled: boolean;
+  boundingBox?: { x: number; y: number; width: number; height: number };
+  sectionContext?: string;
+}
+
+export interface ScanUrlResponse {
+  url: string;
+  title: string;
+  screenshot: string;
+  candidates: ScannedElement[];
+}
+
+export async function scanUrl(url: string): Promise<ScanUrlResponse> {
+  const res = await fetch(`${BASE}/scan-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to scan URL (HTTP ${res.status})`);
+  }
+  return res.json();
+}
+
+export async function generateContract(payload: {
+  url: string;
+  title?: string;
+  goal?: string;
+  candidates?: ScannedElement[];
+  useLlm?: boolean;
+}): Promise<any> {
+  const res = await fetch(`${BASE}/generate-contract`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to generate contract (HTTP ${res.status})`);
+  }
   return res.json();
 }
 

@@ -424,6 +424,10 @@ export class RunOrchestrator {
   }
 
   private async resetDemoState(clearMutation: boolean = true): Promise<void> {
+    // Only reset fixtures for the built-in demo environment
+    if (this.contract.environmentId !== "local-demo") {
+      return;
+    }
     try {
       // Unconditionally reset fixtures on every run so baseline and mutations start clean
       await fetch(`${CONFIG.demoOrigin}/api/fixtures/reset`, { method: "POST" });

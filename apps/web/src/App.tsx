@@ -7,6 +7,7 @@ import { RunExplorerView } from "./views/RunExplorerView.js";
 import { MutationLabView } from "./views/MutationLabView.js";
 import { DemoAppView } from "./views/DemoAppView.js";
 import { SettingsView } from "./views/SettingsView.js";
+import { CustomTestBuilder } from "./views/CustomTestBuilder.js";
 import {
   clearAllRuns,
   commitHeal,
@@ -15,10 +16,12 @@ import {
   fetchMutations,
   fetchRunDetail,
   fetchRuns,
+  fetchSettings,
   fetchTestDetail,
   fetchTests,
   resetMutation,
-  subscribeToEvents
+  subscribeToEvents,
+  SystemSettings
 } from "./api.js";
 import { BenchmarkMetrics, MutationScenario, RunDetail, TestRun } from "./types.js";
 import { LiveExecutionOverlay, LiveEventItem } from "./components/shared/LiveExecutionOverlay.js";
@@ -42,27 +45,38 @@ export const App: React.FC = () => {
   const [isExecutionModalOpen, setIsExecutionModalOpen] = useState<boolean>(false);
   const [activeRunningScenario, setActiveRunningScenario] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
 
   const activeUnsubRef = useRef<(() => void) | null>(null);
 
   // Load workbench metadata
   const loadData = async () => {
     try {
-      const [testsList, runsData, benchData, mutsData] = await Promise.all([
+      const [testsList, runsData, benchData, mutsData, settingsData] = await Promise.all([
         fetchTests().catch(() => []),
         fetchRuns().catch(() => []),
         fetchBenchmark().catch(() => null),
-        fetchMutations().catch(() => [])
+        fetchMutations().catch(() => []),
+        fetchSettings().catch(() => null)
       ]);
       setTests(testsList || []);
       const loadedRuns = runsData || [];
       setRuns(loadedRuns);
       setBenchmark(benchData);
       setMutations(mutsData || []);
+      if (settingsData) {
+        setSystemSettings(settingsData);
+      }
 
       // If selected run is not set or invalid, select newest real run
       if (loadedRuns.length > 0) {
         setSelectedRunId(prev => (prev && loadedRuns.some(r => r.id === prev) ? prev : loadedRuns[0].id));
+        const latest = loadedRuns[0];
+        if (["PASSED", "FAILED", "HEALED", "REVIEW_REQUIRED"].includes(latest.status)) {
+          if (!activeUnsubRef.current) {
+            setIsRunningTest(false);
+          }
+        }
       }
 
       const currentId = activeTestId || (testsList && testsList.length > 0 ? testsList[0].id : "checkout-valid-card");
@@ -145,6 +159,13 @@ export const App: React.FC = () => {
     setIsExecutionModalOpen(true);
     setActiveRunningScenario(mutationScenarioId || null);
 
+    // Sync active contract so LiveExecutionOverlay has accurate step pipeline
+    fetchTestDetail(targetTestId).then(spec => {
+      if (spec?.contract) {
+        setActiveContract(spec.contract);
+      }
+    }).catch(console.error);
+
     try {
       const { runId } = await createRun(targetTestId, mutationScenarioId);
       setSelectedRunId(runId);
@@ -221,6 +242,68 @@ export const App: React.FC = () => {
     await handleRunTest(activeTestId, scenarioId);
   };
 
+  const handleCustomRunCreated = async (runId: string, testId: string, customContract?: any) => {
+    setActiveTestId(testId);
+    setSelectedRunId(runId);
+    setIsRunningTest(true);
+    setLiveEvents([]);
+    setLiveStatus("RUNNING");
+    if (customContract) {
+      setActiveContract(customContract);
+    }
+    setIsExecutionModalOpen(true);
+    setActiveRunningScenario(null);
+
+    // Immediately fetch contract so LiveExecutionOverlay has all custom steps
+    fetchTestDetail(testId).then(spec => {
+      if (spec?.contract) {
+        setActiveContract(spec.contract);
+      }
+    }).catch(console.error);
+
+    if (activeUnsubRef.current) {
+      activeUnsubRef.current();
+      activeUnsubRef.current = null;
+    }
+
+    const unsubscribe = subscribeToEvents(runId, (event: any) => {
+      if (event) {
+        setLiveEvents(prev => [
+          ...prev,
+          {
+            id: event.id || `evt_${Date.now()}_${Math.random()}`,
+            type: event.type,
+            timestamp: event.timestamp || new Date().toISOString(),
+            payload: event.payload
+          }
+        ]);
+
+        if (event.type === "RUN_FINISHED") {
+          setLiveStatus(event.payload?.status || "PASSED");
+          setIsRunningTest(false);
+          loadRunDetail(runId);
+          loadData();
+        } else if (event.type === "RUN_FAILED") {
+          setLiveStatus("FAILED");
+          setIsRunningTest(false);
+          loadRunDetail(runId);
+          loadData();
+        } else if (event.type === "REVIEW_REQUIRED") {
+          setLiveStatus("REVIEW_REQUIRED");
+          setIsRunningTest(false);
+          loadRunDetail(runId);
+          loadData();
+        } else if (event.type === "FAILURE_CLASSIFIED") {
+          setLiveStatus("DIAGNOSING");
+        } else if (event.type === "RECOVERY_PROPOSED") {
+          setLiveStatus("HEALING");
+        }
+      }
+    });
+
+    activeUnsubRef.current = unsubscribe;
+  };
+
   const handleResetFixtures = async () => {
     await resetMutation("all");
     await loadData();
@@ -242,6 +325,7 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
         isRunning={isRunningTest}
+        isHeaded={systemSettings ? !systemSettings.headless : true}
       />
 
       {/* Main Content Area */}
@@ -255,7 +339,15 @@ export const App: React.FC = () => {
         />
 
         {/* View Switcher */}
-        <main style={{ flex: 1, paddingBottom: 40, overflowY: "auto" }}>
+        <main
+          style={{
+            flex: 1,
+            overflowY: activeTab === "runs" ? "hidden" : "auto",
+            paddingBottom: activeTab === "runs" ? 0 : 32,
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
           {activeTab === "overview" && (
             <DashboardView
               runs={runs}
@@ -271,8 +363,19 @@ export const App: React.FC = () => {
               onOpenMutationLab={() => {
                 setActiveTab("mutation-lab");
               }}
+              onOpenWorkbench={() => {
+                setActiveTab("workbench");
+              }}
               onRunBaseline={() => handleRunTest(activeTestId)}
               onClearRuns={handleClearRuns}
+              isRunning={isRunningTest}
+            />
+          )}
+
+          {activeTab === "workbench" && (
+            <CustomTestBuilder
+              onRunCreated={handleCustomRunCreated}
+              onSelectTab={setActiveTab}
               isRunning={isRunningTest}
             />
           )}
@@ -322,24 +425,27 @@ export const App: React.FC = () => {
       </div>
 
       {/* Live Real-Time Execution Modal Overlay */}
-      <LiveExecutionOverlay
-        isOpen={isExecutionModalOpen}
-        onClose={() => setIsExecutionModalOpen(false)}
-        runId={selectedRunId}
-        testName={activeTestId}
-        scenarioName={
-          activeRunningScenario
-            ? (mutations.find(m => m.id === activeRunningScenario)?.name || activeRunningScenario)
-            : "Baseline Suite (Canonical Contract)"
-        }
-        status={liveStatus}
-        events={liveEvents}
-        onInspectEvidence={(runId) => {
-          setSelectedRunId(runId);
-          setActiveTab("runs");
-          setIsExecutionModalOpen(false);
-        }}
-      />
+      {isExecutionModalOpen && selectedRunId && (
+        <LiveExecutionOverlay
+          isOpen={isExecutionModalOpen}
+          onClose={() => setIsExecutionModalOpen(false)}
+          runId={selectedRunId}
+          testName={activeContract?.name || activeTestId}
+          scenarioName={
+            activeRunningScenario
+              ? (mutations.find(m => m.id === activeRunningScenario)?.name || activeRunningScenario)
+              : activeContract?.baseUrl || activeContract?.targetUrl || "Baseline Suite (Canonical Contract)"
+          }
+          status={liveStatus}
+          events={liveEvents}
+          contract={activeContract}
+          onInspectEvidence={(runId) => {
+            setSelectedRunId(runId);
+            setActiveTab("runs");
+            setIsExecutionModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 };

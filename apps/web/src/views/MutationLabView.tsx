@@ -146,7 +146,7 @@ export const MutationLabView: React.FC<Props> = ({
   };
 
   return (
-    <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 32px" }}>
+    <div className="workbench-container">
       {/* Header Banner (Linear Alabaster Luminous Card) */}
       <div className="hero-card-alabaster" style={{
         padding: "28px 32px",
@@ -280,7 +280,7 @@ export const MutationLabView: React.FC<Props> = ({
                   }}
                   title="View side-by-side Version A vs Version B comparison"
                 >
-                  <GitCompare size={13} color="#4f46e5" />
+                  <GitCompare size={13} color="#3b52f6" />
                   <span>A/B Split Diff</span>
                 </button>
 
@@ -290,12 +290,12 @@ export const MutationLabView: React.FC<Props> = ({
                   disabled={isRunning}
                   style={{
                     background: isHealable
-                      ? "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)"
+                      ? "linear-gradient(135deg, #3b52f6 0%, #4f46e5 100%)"
                       : (sc.expected === "REVIEW_REQUIRED"
                         ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)"
                         : "linear-gradient(135deg, #e11d48 0%, #be123c 100%)"),
-                    borderColor: isHealable ? "#4338ca" : (sc.expected === "REVIEW_REQUIRED" ? "#6d28d9" : "#be123c"),
-                    boxShadow: isHealable ? "0 2px 8px rgba(79, 70, 229, 0.3)" : "0 2px 8px rgba(225, 29, 72, 0.3)",
+                    borderColor: isHealable ? "#2563eb" : (sc.expected === "REVIEW_REQUIRED" ? "#6d28d9" : "#be123c"),
+                    boxShadow: isHealable ? "0 2px 8px rgba(59, 82, 246, 0.3)" : "0 2px 8px rgba(225, 29, 72, 0.3)",
                     fontSize: 12,
                     padding: "8px 10px",
                     display: "flex",

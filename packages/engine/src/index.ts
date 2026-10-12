@@ -9,3 +9,4 @@ export * from "./llm-adapter.js";
 export * from "./recovery-policy.js";
 export * from "./outcome-verifier.js";
 export * from "./orchestrator.js";
+export * from "./page-scanner.js";

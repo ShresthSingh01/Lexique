@@ -287,67 +287,69 @@ export const VersionSplitView: React.FC<Props> = ({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Top Banner: Scenario Title & Mode */}
-      <div style={{
-        background: "linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)",
-        color: "#ffffff",
-        borderRadius: 10,
-        padding: "16px 20px",
+      <div className="card-clean" style={{
+        padding: "14px 18px",
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "center",
-        boxShadow: "0 4px 12px rgba(15, 23, 42, 0.15)"
+        alignItems: "center"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            background: "rgba(255, 255, 255, 0.1)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}>
-            <GitCompare size={20} color="#818cf8" />
+          <div className="icon-pod icon-pod-cobalt" style={{ width: 36, height: 36 }}>
+            <GitCompare size={18} />
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
               {currentScenario.title}
             </div>
-            <div style={{ fontSize: 12, color: "#94a3b8", display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-              <span>Category: <strong style={{ color: "#c7d2fe" }}>{currentScenario.category}</strong></span>
-              <span>•</span>
-              <span>Diff Type: <strong style={{ color: "#a5b4fc" }}>{currentScenario.diffType}</strong></span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+              <span style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#1d4ed8",
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                borderRadius: 4,
+                padding: "1px 6px"
+              }}>
+                {currentScenario.category}
+              </span>
+              <span style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "#475569",
+                background: "#f1f5f9",
+                border: "1px solid #e2e8f0",
+                borderRadius: 4,
+                padding: "1px 6px"
+              }}>
+                {currentScenario.diffType}
+              </span>
             </div>
           </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{
-            fontSize: 11,
-            fontWeight: 800,
-            padding: "4px 10px",
-            borderRadius: 6,
-            background: runStatus === "HEALED" ? "#065f46" : (runStatus === "PASSED" ? "#1e40af" : (runStatus === "REVIEW_REQUIRED" ? "#92400e" : "#9f1239")),
-            color: "#ffffff",
-            fontFamily: "var(--font-mono)"
-          }}>
+          <span className={`badge ${runStatus === "HEALED" ? "badge-healed" : (runStatus === "PASSED" ? "badge-passed" : (runStatus === "REVIEW_REQUIRED" ? "badge-review" : "badge-failed"))}`}>
             OUTCOME: {runStatus}
           </span>
         </div>
       </div>
 
       {/* Side-by-Side Version A vs Version B Split Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 14 }}>
         {/* LEFT COLUMN: Version A (Baseline) */}
         <div style={{
           background: "#ffffff",
-          border: "2px solid #93c5fd",
+          border: "1px solid #bfdbfe",
           borderRadius: 10,
-          padding: 16,
+          padding: 14,
           display: "flex",
           flexDirection: "column",
-          gap: 12,
-          boxShadow: "0 2px 8px rgba(59, 130, 246, 0.08)"
+          gap: 10,
+          minWidth: 0,
+          overflow: "hidden",
+          boxSizing: "border-box",
+          boxShadow: "var(--shadow-card)"
         }}>
           <div style={{
             display: "flex",
@@ -380,7 +382,7 @@ export const VersionSplitView: React.FC<Props> = ({
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
             <div style={{ background: "#f8fafc", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-light)" }}>
               <div style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 700, textTransform: "uppercase" }}>Target Element Locator:</div>
-              <div style={{ fontFamily: "var(--font-mono)", color: "#2563eb", fontWeight: 700, marginTop: 2 }}>
+              <div style={{ fontFamily: "var(--font-mono)", color: "#2563eb", fontWeight: 700, marginTop: 2, wordBreak: "break-all" }}>
                 {currentScenario.versionA.locator}
               </div>
             </div>
@@ -422,7 +424,8 @@ export const VersionSplitView: React.FC<Props> = ({
               overflowX: "auto",
               fontFamily: "var(--font-mono)",
               lineHeight: 1.4,
-              margin: 0
+              margin: 0,
+              maxWidth: "100%"
             }}>
               {currentScenario.versionA.domSnippet}
             </pre>
@@ -432,13 +435,16 @@ export const VersionSplitView: React.FC<Props> = ({
         {/* RIGHT COLUMN: Version B (Observed / Mutated) */}
         <div style={{
           background: "#ffffff",
-          border: runStatus === "HEALED" ? "2px solid #a7f3d0" : (runStatus === "FAILED" ? "2px solid #fecdd3" : "2px solid #fde68a"),
+          border: runStatus === "HEALED" ? "1px solid #a7f3d0" : (runStatus === "FAILED" ? "1px solid #fecdd3" : "1px solid #fde68a"),
           borderRadius: 10,
-          padding: 16,
+          padding: 14,
           display: "flex",
           flexDirection: "column",
-          gap: 12,
-          boxShadow: runStatus === "HEALED" ? "0 2px 8px rgba(16, 185, 129, 0.1)" : "0 2px 8px rgba(225, 29, 72, 0.1)"
+          gap: 10,
+          minWidth: 0,
+          overflow: "hidden",
+          boxSizing: "border-box",
+          boxShadow: runStatus === "HEALED" ? "0 2px 8px rgba(16, 185, 129, 0.08)" : "0 2px 8px rgba(225, 29, 72, 0.08)"
         }}>
           <div style={{
             display: "flex",
@@ -475,7 +481,7 @@ export const VersionSplitView: React.FC<Props> = ({
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
             <div style={{ background: "#f8fafc", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-light)" }}>
               <div style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 700, textTransform: "uppercase" }}>Discovered / Observed Locator:</div>
-              <div style={{ fontFamily: "var(--font-mono)", color: runStatus === "HEALED" ? "#059669" : "#e11d48", fontWeight: 700, marginTop: 2 }}>
+              <div style={{ fontFamily: "var(--font-mono)", color: runStatus === "HEALED" ? "#059669" : "#e11d48", fontWeight: 700, marginTop: 2, wordBreak: "break-all" }}>
                 {currentScenario.versionB.locator}
               </div>
             </div>
@@ -539,7 +545,8 @@ export const VersionSplitView: React.FC<Props> = ({
               overflowX: "auto",
               fontFamily: "var(--font-mono)",
               lineHeight: 1.4,
-              margin: 0
+              margin: 0,
+              maxWidth: "100%"
             }}>
               {currentScenario.versionB.domSnippet}
             </pre>

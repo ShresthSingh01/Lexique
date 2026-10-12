@@ -10,7 +10,7 @@ export const DemoAppView: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 32px" }}>
+    <div className="workbench-container">
       {/* Header Bar */}
       <div style={{
         display: "flex",

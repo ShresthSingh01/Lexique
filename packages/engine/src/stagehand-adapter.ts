@@ -11,6 +11,8 @@ export class StagehandAdapter {
       // Find candidate elements matching the intent action type
       const selector = actionType === "fill"
         ? "input:not([type='hidden']), textarea, [contenteditable='true']"
+        : (actionType === "assert_visible" || actionType === "assert_text")
+        ? "h1, h2, h3, h4, p, span, div[role], button, a, input, [data-testid], section, article"
         : "button, a[role='button'], a[href], input[type='submit'], input[type='button'], [role='button']";
 
       const nodes = Array.from(document.querySelectorAll(selector));

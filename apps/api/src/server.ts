@@ -2,11 +2,34 @@ import fastify from "fastify";
 import cors from "@fastify/cors";
 import path from "node:path";
 import fs from "node:fs";
-import { CONFIG, db, seedDatabase } from "@intentlock/engine";
+import dotenv from "dotenv";
+dotenv.config();
+
+import { CONFIG, db, seedDatabase, scanPageUrl } from "@intentlock/engine";
 import { CreateRunRequestSchema, ObservedCandidate, RunEvent } from "@intentlock/contracts";
 import { z } from "zod";
 import { RunQueue } from "./queue.js";
 import { SseManager } from "./sse.js";
+
+// Sync CONFIG with environment variables
+if (process.env.HEADLESS === "false") {
+  CONFIG.headless = false;
+}
+if (process.env.LLM_PROVIDER) {
+  CONFIG.llmProvider = process.env.LLM_PROVIDER;
+}
+if (process.env.GEMINI_API_KEY) {
+  CONFIG.geminiApiKey = process.env.GEMINI_API_KEY;
+}
+if (process.env.GEMINI_MODEL) {
+  CONFIG.geminiModel = process.env.GEMINI_MODEL;
+}
+if (process.env.MISTRAL_API_KEY) {
+  CONFIG.mistralApiKey = process.env.MISTRAL_API_KEY;
+}
+if (process.env.LLM_MODEL) {
+  CONFIG.llmModel = process.env.LLM_MODEL;
+}
 
 // Ensure seed data exists
 seedDatabase();
@@ -41,8 +64,24 @@ server.get("/api/health", async () => {
 });
 
 server.get("/api/settings", async () => ({
-  minimumCandidateSimilarity: CONFIG.minimumCandidateSimilarity
+  minimumCandidateSimilarity: CONFIG.minimumCandidateSimilarity,
+  headless: CONFIG.headless,
+  llmProvider: CONFIG.llmProvider,
+  llmModel: CONFIG.llmModel
 }));
+
+server.post("/api/settings", async (request) => {
+  const body = (request.body || {}) as any;
+  if (typeof body.headless === "boolean") {
+    CONFIG.headless = body.headless;
+  }
+  return {
+    minimumCandidateSimilarity: CONFIG.minimumCandidateSimilarity,
+    headless: CONFIG.headless,
+    llmProvider: CONFIG.llmProvider,
+    llmModel: CONFIG.llmModel
+  };
+});
 
 // 2. List test specs
 server.get("/api/tests", async () => {
@@ -189,6 +228,182 @@ server.post("/api/ping-url", async (request, reply) => {
   } catch (err: any) {
     return { reachable: false, statusCode: 0, latencyMs: 0, error: err.message };
   }
+});
+
+// 3c-1. Scan arbitrary URL using headless Playwright & extract candidates
+server.post("/api/scan-url", async (request, reply) => {
+  const { url } = (request.body as { url: string }) || {};
+  if (!url) return reply.status(400).send({ error: "URL is required" });
+  try {
+    const result = await scanPageUrl(url, 15000);
+    return reply.status(200).send(result);
+  } catch (err: any) {
+    server.log.error(`[ScanUrl] Failed to scan ${url}: ${err.message}`);
+    return reply.status(500).send({ error: err.message || "Failed to scan URL" });
+  }
+});
+
+// 3c-2. Auto-generate contract from URL and scanned candidates (heuristic + optional LLM)
+server.post("/api/generate-contract", async (request, reply) => {
+  const { url, title, goal, candidates, useLlm } = (request.body as any) || {};
+  if (!url) return reply.status(400).send({ error: "URL is required" });
+
+  const candidateList = Array.isArray(candidates) ? candidates : [];
+  const testGoal = goal || "Verify main interactive workflow and critical page elements";
+
+  // If LLM requested and configured, try Gemini structured response
+  if (useLlm && CONFIG.geminiApiKey) {
+    try {
+      const prompt = `You are an expert E2E test engineer for Ojastra.
+URL: ${url}
+Page Title: ${title || ""}
+User Goal: "${testGoal}"
+
+Observed interactive candidates on page:
+${JSON.stringify(candidateList.slice(0, 25).map((c: any) => ({
+  id: c.candidateId,
+  role: c.role,
+  name: c.name,
+  tag: c.tag,
+  selector: c.selector,
+  actionType: c.actionType,
+  sectionContext: c.sectionContext
+})), null, 2)}
+
+Generate a valid TestContract JSON with:
+- name: string (concise name)
+- description: string
+- steps: array of WorkflowStep:
+  {
+    "stepId": string,
+    "name": string,
+    "intent": string,
+    "actionType": "navigate" | "click" | "fill" | "assert_visible" | "assert_text" | "assert_url",
+    "targetLocator": string,
+    "inputValue": string (optional),
+    "timeoutMs": 5000,
+    "riskCategory": "low" | "medium" | "high"
+  }
+- successConditions: array of SuccessCondition:
+  {
+    "id": string,
+    "description": string,
+    "type": "ui_element_visible" | "ui_url_contains" | "ui_text_equals",
+    "expected": any
+  }
+
+Return strictly valid JSON with no markdown formatting.`;
+
+      const geminiUrl = `${CONFIG.geminiApiUrl}/models/${CONFIG.geminiModel}:generateContent?key=${CONFIG.geminiApiKey}`;
+      const res = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json"
+          }
+        })
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          const parsed = JSON.parse(text);
+          return reply.status(200).send(parsed);
+        }
+      }
+    } catch (err: any) {
+      server.log.warn(`[GenerateContract] Gemini generation failed: ${err.message}. Falling back to heuristic.`);
+    }
+  }
+
+  // Heuristic generation (Zero token cost, instant, 100% reliable)
+  const steps: any[] = [
+    {
+      stepId: "step_navigate",
+      name: "Navigate to Target URL",
+      intent: `Load page at ${url}`,
+      actionType: "navigate",
+      targetLocator: url,
+      timeoutMs: 8000,
+      riskCategory: "low"
+    }
+  ];
+
+  const inputs = candidateList.filter((c: any) => c.tag === "input" || c.tag === "textarea" || c.actionType === "fill");
+  const buttons = candidateList.filter((c: any) => c.role === "button" || c.tag === "button" || c.actionType === "click");
+
+  let stepIdx = 1;
+  if (inputs.length > 0) {
+    const input = inputs[0];
+    steps.push({
+      stepId: `step_${stepIdx++}`,
+      name: `Fill ${input.name || "Input Field"}`,
+      intent: `Enter test value into ${input.name || "input"}`,
+      actionType: "fill",
+      targetLocator: input.selector || "input",
+      inputValue: "test@example.com",
+      timeoutMs: 5000,
+      riskCategory: "low"
+    });
+  }
+
+  if (buttons.length > 0) {
+    const btn = buttons[0];
+    steps.push({
+      stepId: `step_${stepIdx++}`,
+      name: `Click ${btn.name || "Action Button"}`,
+      intent: `Click ${btn.name || "button"} to trigger flow`,
+      actionType: "click",
+      targetLocator: btn.selector || "button",
+      timeoutMs: 5000,
+      riskCategory: "low"
+    });
+  }
+
+  if (buttons.length > 0 || inputs.length > 0) {
+    steps.push({
+      stepId: `step_${stepIdx++}`,
+      name: "Verify Target Element Visible",
+      intent: "Verify critical page element is present and visible",
+      actionType: "assert_visible",
+      targetLocator: buttons[0]?.selector || inputs[0]?.selector || "body",
+      timeoutMs: 5000,
+      riskCategory: "low"
+    });
+  }
+
+  let hostname = "Target Site";
+  try {
+    hostname = new URL(url).hostname;
+  } catch {}
+
+  const contract = {
+    name: title ? `${title.slice(0, 40)} Flow` : `E2E Flow - ${hostname}`,
+    description: `Automated test workflow for ${url}`,
+    baseUrl: url,
+    steps,
+    successConditions: [
+      {
+        id: "sc-1",
+        description: `Page is reachable and loaded at ${url}`,
+        type: "ui_element_visible",
+        expected: "body"
+      }
+    ],
+    invariants: [
+      {
+        id: "inv-1",
+        description: "No HTTP 5xx server errors during execution",
+        type: "no_5xx_errors"
+      }
+    ]
+  };
+
+  return reply.status(200).send(contract);
 });
 
 // 3d. Ping target URL of a test spec

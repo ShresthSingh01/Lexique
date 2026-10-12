@@ -10,7 +10,8 @@ import {
   TrendingUp,
   Cpu,
   Trash2,
-  Inbox
+  Inbox,
+  Globe
 } from "lucide-react";
 import { BenchmarkMetrics, TestRun } from "../types.js";
 
@@ -20,6 +21,7 @@ interface Props {
   onSelectRun: (runId: string) => void;
   onOpenTestEditor: () => void;
   onOpenMutationLab: () => void;
+  onOpenWorkbench?: () => void;
   onRunBaseline: () => void;
   onClearRuns?: () => Promise<void>;
   isRunning?: boolean;
@@ -32,6 +34,7 @@ export const DashboardView: React.FC<Props> = ({
   onSelectRun,
   onOpenTestEditor,
   onOpenMutationLab,
+  onOpenWorkbench,
   onRunBaseline,
   onClearRuns,
   isRunning,
@@ -80,7 +83,7 @@ export const DashboardView: React.FC<Props> = ({
     : displayRuns;
 
   return (
-    <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 32px" }}>
+    <div className="workbench-container">
       {/* Dashboard Top Header */}
       <div style={{
         display: "flex",
@@ -122,6 +125,22 @@ export const DashboardView: React.FC<Props> = ({
             >
               <Trash2 size={13} />
               <span>Clear History</span>
+            </button>
+          )}
+
+          {onOpenWorkbench && (
+            <button
+              className="btn btn-secondary"
+              onClick={onOpenWorkbench}
+              style={{
+                fontSize: 12,
+                padding: "8px 14px",
+                borderColor: "rgba(37, 99, 235, 0.3)",
+                color: "var(--accent-blue)"
+              }}
+            >
+              <Globe size={14} color="var(--accent-blue)" />
+              <span>Any-Site Workbench</span>
             </button>
           )}
 

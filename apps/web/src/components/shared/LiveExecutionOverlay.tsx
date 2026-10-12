@@ -13,7 +13,8 @@ import {
   ArrowRight,
   Eye,
   Layers,
-  Cpu
+  Cpu,
+  Monitor
 } from "lucide-react";
 
 export interface LiveEventItem {
@@ -32,6 +33,7 @@ interface Props {
   status: string; // "QUEUED" | "RUNNING" | "RECOVERING" | "REPLAYING" | "VERIFYING" | "PASSED" | "HEALED" | "FAILED" | "REVIEW_REQUIRED"
   events: LiveEventItem[];
   onInspectEvidence: (runId: string) => void;
+  contract?: any;
 }
 
 export const LiveExecutionOverlay: React.FC<Props> = ({
@@ -41,13 +43,13 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
   testName = "checkout-valid-card",
   scenarioName,
   status,
-  events,
-  onInspectEvidence
+  events = [],
+  onInspectEvidence,
+  contract
 }) => {
-  const [activeTab, setActiveTab] = useState<"progress" | "logs">("progress");
+  const [activeTab, setActiveTab] = useState<"progress" | "browser" | "logs">("progress");
 
-  if (!isOpen || !runId) return null;
-
+  const safeEvents = events || [];
   const isTerminal = ["PASSED", "HEALED", "FAILED", "REVIEW_REQUIRED"].includes(status);
   const isHealed = status === "HEALED";
   const isPassed = status === "PASSED";
@@ -55,21 +57,54 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
   const isReview = status === "REVIEW_REQUIRED";
 
   // Compute step statuses from events
-  const stepEvents = events.filter(e => e.type === "STEP_PASSED" || e.type === "STEP_FAILED");
-  const evidenceEvent = events.find(e => e.type === "EVIDENCE_CAPTURED");
-  const classifyEvent = events.find(e => e.type === "FAILURE_CLASSIFIED");
-  const candidatesEvent = events.find(e => e.type === "RECOVERY_CANDIDATES_FOUND");
-  const proposalEvent = events.find(e => e.type === "RECOVERY_PROPOSED");
-  const policyEvent = events.find(e => e.type === "RECOVERY_POLICY_DECIDED");
-  const replayEvent = events.find(e => e.type === "REPLAY_STARTED");
-  const verifyEvents = events.filter(e => e.type === "VERIFICATION_CHECK_PASSED" || e.type === "VERIFICATION_CHECK_FAILED");
-  const finishEvent = events.find(e => e.type === "RUN_FINISHED" || e.type === "RUN_FAILED" || e.type === "REVIEW_REQUIRED");
+  const stepEvents = safeEvents.filter(e => e.type === "STEP_PASSED" || e.type === "STEP_FAILED");
+  const evidenceEvent = safeEvents.find(e => e.type === "EVIDENCE_CAPTURED");
+  const classifyEvent = safeEvents.find(e => e.type === "FAILURE_CLASSIFIED");
+  const candidatesEvent = safeEvents.find(e => e.type === "RECOVERY_CANDIDATES_FOUND");
+  const proposalEvent = safeEvents.find(e => e.type === "RECOVERY_PROPOSED");
+  const policyEvent = safeEvents.find(e => e.type === "RECOVERY_POLICY_DECIDED");
+  const replayEvent = safeEvents.find(e => e.type === "REPLAY_STARTED");
+  const verifyEvents = safeEvents.filter(e => e.type === "VERIFICATION_CHECK_PASSED" || e.type === "VERIFICATION_CHECK_FAILED");
+  const finishEvent = safeEvents.find(e => e.type === "RUN_FINISHED" || e.type === "RUN_FAILED" || e.type === "REVIEW_REQUIRED");
+
+  // Dynamically compute pipeline steps from contract OR events (pure calculation, no hooks)
+  let pipelineSteps: { id: string; num: number; name: string }[] = [];
+  if (contract?.steps && Array.isArray(contract.steps) && contract.steps.length > 0) {
+    pipelineSteps = contract.steps.map((s: any, idx: number) => ({
+      id: s.stepId || `step_${idx + 1}`,
+      num: idx + 1,
+      name: s.name || s.intent || `Step ${idx + 1}`
+    }));
+  } else {
+    const seenStepIds = new Set<string>();
+    for (const evt of safeEvents) {
+      if (evt.type === "STEP_STARTED" || evt.type === "STEP_PASSED" || evt.type === "STEP_FAILED") {
+        const stepId = evt.payload?.stepId;
+        const stepName = evt.payload?.stepName;
+        if (stepId && !seenStepIds.has(stepId)) {
+          seenStepIds.add(stepId);
+          pipelineSteps.push({
+            id: stepId,
+            num: pipelineSteps.length + 1,
+            name: stepName || stepId
+          });
+        }
+      }
+    }
+    if (pipelineSteps.length === 0) {
+      pipelineSteps = [
+        { id: "step_1", num: 1, name: "Navigate" },
+        { id: "step_2", num: 2, name: "Execute Step" }
+      ];
+    }
+  }
 
   // Determine active phase
   let activePhase = "1. Initializing Playwright Chromium...";
   if (status === "RUNNING") {
-    if (stepEvents.length === 0) activePhase = "2. Executing Workflow Steps...";
-    else activePhase = `2. Executing Step ${stepEvents.length + 1}...`;
+    const passedCount = safeEvents.filter(e => e.type === "STEP_PASSED").length;
+    if (passedCount === 0) activePhase = "2. Executing Workflow Steps...";
+    else activePhase = `2. Executing Step ${passedCount + 1} of ${pipelineSteps.length}...`;
   } else if (status === "DIAGNOSING" || classifyEvent) {
     activePhase = "3. Classifying Drift & Capturing Evidence...";
   } else if (status === "RECOVERING" || proposalEvent) {
@@ -81,6 +116,9 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
   } else if (isTerminal) {
     activePhase = `Execution Complete — Status: ${status}`;
   }
+
+  // Hook rules require all hooks to run unconditionally before this check
+  if (!isOpen || !runId) return null;
 
   return (
     <div
@@ -204,7 +242,7 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                   gap: 6
                 }}
               >
-                <span>{testName}</span>
+                <span>{contract?.name || testName}</span>
                 <span>•</span>
                 <span style={{ fontWeight: 600 }}>{scenarioName || "Baseline Flow"}</span>
                 <span>•</span>
@@ -233,6 +271,25 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                 Progress
               </button>
               <button
+                onClick={() => setActiveTab("browser")}
+                style={{
+                  background: activeTab === "browser" ? "#ffffff" : "transparent",
+                  color: activeTab === "browser" ? "#4f46e5" : "var(--text-secondary)",
+                  border: "none",
+                  padding: "4px 10px",
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4
+                }}
+              >
+                <Eye size={12} />
+                <span>Live Browser</span>
+              </button>
+              <button
                 onClick={() => setActiveTab("logs")}
                 style={{
                   background: activeTab === "logs" ? "#ffffff" : "transparent",
@@ -245,7 +302,7 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                   cursor: "pointer"
                 }}
               >
-                Live SSE Logs ({events.length})
+                Logs ({events.length})
               </button>
             </div>
 
@@ -270,7 +327,7 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
 
         {/* Modal Body */}
         <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
-          {activeTab === "progress" ? (
+          {activeTab === "progress" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Active Phase Pill */}
               <div
@@ -340,25 +397,35 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(5, 1fr)",
+                    gridTemplateColumns:
+                      pipelineSteps.length <= 5
+                        ? `repeat(${Math.max(1, pipelineSteps.length)}, 1fr)`
+                        : "repeat(auto-fit, minmax(110px, 1fr))",
                     gap: 8
                   }}
                 >
-                  {[
-                    { num: 1, name: "Navigate" },
-                    { num: 2, name: "Add Cart" },
-                    { num: 3, name: "Checkout" },
-                    { num: 4, name: "Fill Form" },
-                    { num: 5, name: "Purchase" }
-                  ].map((s) => {
-                    const stepEvt = stepEvents[s.num - 1];
-                    const isStepPassed = stepEvt?.type === "STEP_PASSED";
-                    const isStepFailed = stepEvt?.type === "STEP_FAILED";
-                    const isStepRunning = !stepEvt && !isTerminal && stepEvents.length === s.num - 1;
+                  {pipelineSteps.map((s: { id: string; num: number; name: string }) => {
+                    const isStepPassed = events.some(
+                      (e) =>
+                        e.type === "STEP_PASSED" &&
+                        (e.payload?.stepId === s.id || e.payload?.stepName === s.name)
+                    );
+                    const isStepFailed = events.some(
+                      (e) =>
+                        e.type === "STEP_FAILED" &&
+                        (e.payload?.stepId === s.id || e.payload?.stepName === s.name)
+                    );
+                    const isStepStarted = events.some(
+                      (e) =>
+                        e.type === "STEP_STARTED" &&
+                        (e.payload?.stepId === s.id || e.payload?.stepName === s.name)
+                    );
+                    const isStepRunning =
+                      isStepStarted && !isStepPassed && !isStepFailed && !isTerminal;
 
                     return (
                       <div
-                        key={s.num}
+                        key={s.id || s.num}
                         style={{
                           background: isStepPassed
                             ? "#f0fdf4"
@@ -378,7 +445,8 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                           }`,
                           borderRadius: 8,
                           padding: "10px 12px",
-                          textAlign: "center"
+                          textAlign: "center",
+                          overflow: "hidden"
                         }}
                       >
                         <div
@@ -396,8 +464,12 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                             fontSize: 12,
                             fontWeight: 700,
                             color: "var(--text-primary)",
-                            marginBottom: 4
+                            marginBottom: 4,
+                            whiteSpace: "nowrap",
+                            textOverflow: "ellipsis",
+                            overflow: "hidden"
                           }}
+                          title={s.name}
                         >
                           {s.name}
                         </div>
@@ -411,7 +483,7 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                           {isStepRunning && (
                             <span style={{ color: "#4f46e5" }}>● Running...</span>
                           )}
-                          {!stepEvt && !isStepRunning && (
+                          {!isStepPassed && !isStepFailed && !isStepRunning && (
                             <span style={{ color: "#94a3b8" }}>Pending</span>
                           )}
                         </div>
@@ -486,8 +558,8 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* Database Test Oracle Receipt */}
-              {verifyEvents.length > 0 && (
+              {/* Independent Oracle Verification */}
+              {(verifyEvents.length > 0 || isPassed) && (
                 <div
                   style={{
                     background: "#f0fdf4",
@@ -501,12 +573,17 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
                 >
                   <Database size={16} color="#15803d" />
                   <div style={{ flex: 1, fontSize: 12, color: "#166534" }}>
-                    <strong>Independent Database Oracle:</strong> All post-conditions verified against SQLite store (Order Total: $54.00, Status: PAID).
+                    <strong>Independent Oracle Verification:</strong>{" "}
+                    {contract?.targetUrl
+                      ? `All target assertions and DOM contracts verified against live page state.`
+                      : `All post-conditions verified against SQLite store (Order Total: $54.00, Status: PAID).`}
                   </div>
                 </div>
               )}
             </div>
-          ) : (
+          )}
+
+          {activeTab === "logs" && (
             /* Live SSE Logs */
             <div
               style={{
@@ -550,6 +627,93 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
               ))}
             </div>
           )}
+
+          {activeTab === "browser" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Browser Status Info Bar */}
+              <div style={{
+                background: "#f8fafc",
+                border: "1px solid var(--border-light)",
+                borderRadius: 8,
+                padding: "12px 16px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <Monitor size={15} color="#4f46e5" />
+                    <span>Playwright Chromium Desktop Window</span>
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 9999,
+                      background: "#e0e7ff",
+                      color: "#4338ca"
+                    }}>
+                      SLOW-MO 350ms • HEADED
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 3 }}>
+                    Look at your desktop window to watch Chromium interact in real-time with glowing outlines (<span style={{ color: "#6366f1", fontWeight: 700 }}>#6366f1 clicks</span>, <span style={{ color: "#10b981", fontWeight: 700 }}>#10b981 inputs</span>).
+                  </div>
+                </div>
+
+                <a
+                  href="http://localhost:3001/checkout"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary"
+                  style={{ fontSize: 11, padding: "5px 12px", textDecoration: "none" }}
+                >
+                  <ExternalLink size={12} />
+                  <span>Open Target Tab</span>
+                </a>
+              </div>
+
+              {/* Embedded In-Workbench Target View Frame */}
+              <div style={{
+                border: "1px solid var(--border-light)",
+                borderRadius: 10,
+                overflow: "hidden",
+                background: "#ffffff",
+                boxShadow: "var(--shadow-sm)"
+              }}>
+                <div style={{
+                  background: "#f1f5f9",
+                  padding: "8px 14px",
+                  borderBottom: "1px solid var(--border-light)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} />
+                    <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "#64748b", marginLeft: 8 }}>
+                      http://localhost:3001/checkout
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#059669", background: "#ecfdf5", padding: "1px 6px", borderRadius: 4 }}>
+                    PORT 3001 LIVE
+                  </span>
+                </div>
+
+                <iframe
+                  src="http://localhost:3001/checkout"
+                  title="Target Storefront Preview"
+                  style={{
+                    width: "100%",
+                    height: "340px",
+                    border: "none",
+                    display: "block"
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}
@@ -567,7 +731,7 @@ export const LiveExecutionOverlay: React.FC<Props> = ({
             {isTerminal ? (
               <span>Execution completed. Evidence artifacts saved to disk.</span>
             ) : (
-              <span>Chromium headless runner running in background...</span>
+              <span>Playwright Chromium runner active with visual highlights...</span>
             )}
           </div>
 

@@ -70,7 +70,12 @@ export class FailureClassifier {
     }
 
     // Signal: Locator Drift
-    const isInteractiveAction = ctx.actionType === "click" || ctx.actionType === "fill" || ctx.actionType === "select";
+    const isInteractiveAction =
+      ctx.actionType === "click" ||
+      ctx.actionType === "fill" ||
+      ctx.actionType === "select" ||
+      ctx.actionType === "assert_visible" ||
+      ctx.actionType === "assert_text";
 
     if (vectorResult.category === "LOCATOR_DRIFT" ||
         msg.includes("waiting for locator") ||

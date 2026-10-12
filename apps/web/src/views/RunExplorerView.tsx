@@ -18,7 +18,8 @@ import {
   XCircle,
   MessageSquareText,
   GitCompare,
-  Eye
+  Eye,
+  Sparkles
 } from "lucide-react";
 import { VersionSplitView } from "../components/shared/VersionSplitView.js";
 
@@ -172,12 +173,12 @@ export const RunExplorerView: React.FC<Props> = ({
   );
 
   return (
-    <div style={{ height: "calc(100vh - 65px)", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100%", minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
       {/* Top Run Header Bar */}
       <div style={{
         background: "#ffffff",
         borderBottom: "1px solid var(--border-light)",
-        padding: "14px 28px",
+        padding: "12px 28px",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
@@ -187,7 +188,7 @@ export const RunExplorerView: React.FC<Props> = ({
           <StatusBadge status={run.status} />
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>
-              Run ID: <span style={{ fontFamily: "var(--font-mono)", color: "#4f46e5" }}>{run.id}</span>
+              Run ID: <span style={{ fontFamily: "var(--font-mono)", color: "#3b52f6" }}>{run.id}</span>
             </div>
             <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
               {run.mutation_scenario_id ? `Mutation Scenario: ${run.mutation_scenario_id}` : "Baseline Test (Canonical Contract)"} • Started {new Date(run.started_at).toLocaleTimeString()}
@@ -218,27 +219,27 @@ export const RunExplorerView: React.FC<Props> = ({
       </div>
 
       {/* 3-Pane Evidence Body */}
-      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "310px 1fr 430px", overflow: "hidden" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "210px minmax(0, 1fr) 365px", overflow: "hidden" }}>
         {/* Pane 1: Left Step Execution Timeline */}
         <div style={{
           background: "#ffffff",
           borderRight: "1px solid var(--border-light)",
           overflowY: "auto",
-          padding: 16
+          padding: 14
         }}>
           <div style={{
             fontSize: 11,
             fontWeight: 800,
-            color: "#4f46e5",
+            color: "#3b52f6",
             textTransform: "uppercase",
-            marginBottom: 12,
+            marginBottom: 10,
             letterSpacing: "0.05em",
             fontFamily: "var(--font-mono)"
           }}>
             Execution Steps ({steps.length})
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {steps.map((step, idx) => {
               const isSelected = activeStep?.id === step.id;
               return (
@@ -246,33 +247,33 @@ export const RunExplorerView: React.FC<Props> = ({
                   key={step.id}
                   onClick={() => setSelectedStepId(step.id)}
                   style={{
-                    background: isSelected ? "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)" : "#f8fafc",
-                    border: isSelected ? "1px solid #c7d2fe" : "1px solid var(--border-light)",
+                    background: isSelected ? "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)" : "#ffffff",
+                    border: isSelected ? "1px solid #93c5fd" : "1px solid var(--border-light)",
                     borderRadius: 8,
-                    padding: "10px 12px",
+                    padding: "8px 10px",
                     cursor: "pointer",
                     transition: "all 0.12s ease",
-                    boxShadow: isSelected ? "0 2px 6px rgba(79, 70, 229, 0.1)" : "none"
+                    boxShadow: isSelected ? "0 1px 4px rgba(59, 82, 246, 0.12)" : "var(--shadow-sm)"
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, color: isSelected ? "#4f46e5" : "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                    <span style={{ fontSize: 10, color: isSelected ? "#1d4ed8" : "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
                       STEP {idx + 1}
                     </span>
-                    <span style={{ fontSize: 11, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+                    <span style={{ fontSize: 10, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
                       {step.duration_ms}ms
                     </span>
                   </div>
 
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={step.step_name}>
                     {step.step_name}
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <StatusBadge status={step.status} />
                     {step.status === "HEALED" && (
-                      <span style={{ fontSize: 10, color: "#059669", fontWeight: 800, fontFamily: "var(--font-mono)" }}>
-                        ✨ REPLAY HEALED
+                      <span style={{ fontSize: 9, color: "#059669", fontWeight: 800, fontFamily: "var(--font-mono)" }}>
+                        ✨ HEALED
                       </span>
                     )}
                   </div>
@@ -374,62 +375,71 @@ export const RunExplorerView: React.FC<Props> = ({
           )}
 
           {/* Screenshot Evidence / Split View Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)" }}>
-                {centerViewMode === "split" ? "Version A vs Version B Visual Markup" : "Playwright Viewport Evidence Capture"}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 14,
+            gap: 12,
+            flexWrap: "nowrap"
+          }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {centerViewMode === "split" ? "A/B Semantic Split Markup" : "Playwright Viewport Capture"}
               </h3>
-              <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+              <p style={{ fontSize: 11, color: "var(--text-secondary)", margin: "2px 0 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {centerViewMode === "split"
-                  ? "Side-by-side comparative split with marked up changes and invariant verification."
-                  : "Real browser viewport captured for this Playwright step attempt."}
+                  ? "Contract Baseline vs Mutated Application State"
+                  : "Live browser viewport recorded for this step attempt"}
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {/* View Mode Toggle */}
-              <div style={{ display: "flex", gap: 3, background: "#f1f5f9", padding: 3, borderRadius: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              {/* View Mode Toggle Segment */}
+              <div style={{ display: "inline-flex", background: "#f1f5f9", padding: 2, borderRadius: 7, border: "1px solid var(--border-light)" }}>
                 <button
                   type="button"
                   onClick={() => setCenterViewMode("split")}
                   style={{
                     background: centerViewMode === "split" ? "#ffffff" : "transparent",
-                    color: centerViewMode === "split" ? "#4f46e5" : "var(--text-secondary)",
+                    color: centerViewMode === "split" ? "#2563eb" : "var(--text-secondary)",
                     border: "none",
-                    borderRadius: 6,
-                    padding: "5px 10px",
+                    borderRadius: 5,
+                    padding: "4px 9px",
                     fontSize: 11,
                     fontWeight: centerViewMode === "split" ? 700 : 500,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     gap: 5,
-                    boxShadow: centerViewMode === "split" ? "0 1px 3px rgba(0,0,0,0.06)" : "none"
+                    whiteSpace: "nowrap",
+                    boxShadow: centerViewMode === "split" ? "0 1px 3px rgba(15,23,42,0.08)" : "none"
                   }}
                 >
                   <GitCompare size={12} />
-                  <span>A/B Split Markup</span>
+                  <span>A/B Split</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setCenterViewMode("viewport")}
                   style={{
                     background: centerViewMode === "viewport" ? "#ffffff" : "transparent",
-                    color: centerViewMode === "viewport" ? "#4f46e5" : "var(--text-secondary)",
+                    color: centerViewMode === "viewport" ? "#2563eb" : "var(--text-secondary)",
                     border: "none",
-                    borderRadius: 6,
-                    padding: "5px 10px",
+                    borderRadius: 5,
+                    padding: "4px 9px",
                     fontSize: 11,
                     fontWeight: centerViewMode === "viewport" ? 700 : 500,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     gap: 5,
-                    boxShadow: centerViewMode === "viewport" ? "0 1px 3px rgba(0,0,0,0.06)" : "none"
+                    whiteSpace: "nowrap",
+                    boxShadow: centerViewMode === "viewport" ? "0 1px 3px rgba(15,23,42,0.08)" : "none"
                   }}
                 >
                   <Eye size={12} />
-                  <span>Viewport Evidence</span>
+                  <span>Viewport</span>
                 </button>
               </div>
 
@@ -439,9 +449,10 @@ export const RunExplorerView: React.FC<Props> = ({
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-secondary"
-                  style={{ fontSize: 11, padding: "5px 10px" }}
+                  style={{ fontSize: 11, padding: "4px 8px", height: 26, whiteSpace: "nowrap", gap: 4 }}
+                  title="Open DOM Snapshot HTML"
                 >
-                  <FileCode2 size={12} color="#4f46e5" />
+                  <FileCode2 size={12} color="#3b52f6" />
                   <span>DOM</span>
                 </a>
               )}
@@ -451,9 +462,10 @@ export const RunExplorerView: React.FC<Props> = ({
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-secondary"
-                  style={{ fontSize: 11, padding: "5px 10px" }}
+                  style={{ fontSize: 11, padding: "4px 8px", height: 26, whiteSpace: "nowrap", gap: 4 }}
+                  title="View full-size screenshot PNG"
                 >
-                  <ExternalLink size={12} color="#4f46e5" />
+                  <ExternalLink size={12} color="#3b52f6" />
                   <span>PNG</span>
                 </a>
               )}
@@ -532,39 +544,58 @@ export const RunExplorerView: React.FC<Props> = ({
         <div style={{
           background: "#ffffff",
           overflowY: "auto",
-          padding: 18,
+          padding: 16,
           display: "flex",
           flexDirection: "column"
         }}>
           {/* Segmented Audit Tabs */}
-          <div style={{ display: "flex", gap: 4, background: "#f1f5f9", padding: 3, borderRadius: 8, marginBottom: 16 }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            background: "#f8fafc",
+            padding: 3,
+            borderRadius: 8,
+            border: "1px solid var(--border-light)",
+            marginBottom: 16,
+            gap: 2
+          }}>
             {[
-              { id: "diagnostics", label: "Diagnostics" },
-              { id: "split", label: "A/B Diff" },
-              { id: "recovery", label: "Recovery Audit" },
-              { id: "verifier", label: "Oracle Verifier" },
-              { id: "events", label: "Raw Events" }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                style={{
-                  flex: 1,
-                  background: activeTab === tab.id ? "#ffffff" : "transparent",
-                  color: activeTab === tab.id ? "#4f46e5" : "var(--text-secondary)",
-                  border: "none",
-                  borderRadius: 6,
-                  padding: "6px 8px",
-                  fontSize: 11,
-                  fontWeight: activeTab === tab.id ? 700 : 500,
-                  cursor: "pointer",
-                  boxShadow: activeTab === tab.id ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
-                  transition: "all 0.12s ease"
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
+              { id: "diagnostics", label: "Diagnostics", icon: <Activity size={12} /> },
+              { id: "split", label: "A/B Diff", icon: <GitCompare size={12} /> },
+              { id: "recovery", label: "Recovery", icon: <Sparkles size={12} /> },
+              { id: "verifier", label: "Oracle", icon: <ShieldCheck size={12} /> },
+              { id: "events", label: "Events", icon: <Layers size={12} /> }
+            ].map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 3,
+                    background: isActive ? "#ffffff" : "transparent",
+                    color: isActive ? "#1d4ed8" : "var(--text-secondary)",
+                    border: isActive ? "1px solid rgba(191, 219, 254, 0.9)" : "1px solid transparent",
+                    borderRadius: 6,
+                    padding: "5px 3px",
+                    fontSize: 10.5,
+                    fontWeight: isActive ? 700 : 500,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    boxShadow: isActive ? "0 1px 3px rgba(59, 82, 246, 0.08)" : "none",
+                    transition: "all 0.12s ease"
+                  }}
+                  title={tab.label}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Tab 1: Failure Diagnostics */}
